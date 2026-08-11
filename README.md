@@ -1,0 +1,1 @@
+# OpenCL_wstep_pod_praktyki
