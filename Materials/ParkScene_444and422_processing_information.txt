@@ -1,0 +1,41 @@
+This sequence was provided to AHG7 (Range Extensions) for use in
+experiments dealing with non-4:2:0 chroma formats.
+
+It was provided as: 10bit 4:4:4 R'G'B' TIFF files.
+TIFF image data was extracted using tifftopnm.
+       black_point: 16 * 8
+       white_point: 219 * 8
+
+It has been converted in accordance with ITU-R Rec. BT.709 and
+EBU Tech. Rec. 103 into:
+  - Y'CbCr 4:4:4
+  - Y'CbCr 4:2:2
+
+The conversion process was:
+  R'G'B' - black_point
+  -------------------- --> Clip(-0.05,1.05) --> Y'CbCr --> filter(Cb,Cr) --> * 219*4 + 16*4  (luma)   --> round()
+       white_point                              (709)      (4:2:2 only)      * 224*4 + 128*4 (chroma)
+
+All processing was performed in double precision floating point.
+
+For 4:2:2 conversion, the following filter was used (as provided by Gary
+Sullivan and used in the sgi2yuv software)
+
+  -0.01716352771649,
+   0.,
+   0.04066666714886,
+   0.,
+  -0.09154810319329,
+   0.,
+   0.31577823859943,
+   0.50453345032298,
+   0.31577823859943,
+   0.,
+  -0.09154810319329,
+   0.,
+   0.04066666714886,
+   0.,
+  -0.01716352771649,
+
+Any questions regarding the conversion process should be directed to:
+  David Flynn <dflynn@rim.com> (formerly <davidf@rd.bbc.co.uk>
