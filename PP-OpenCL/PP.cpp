@@ -37,6 +37,7 @@
 
 //===============================================================================================================================================================================================================
 
+#include "lib_fmt/printf.h"
 #include "xFile.h"
 #include "xPic.h"
 #include "xSeq.h"
@@ -57,8 +58,8 @@ int32 main(int argc, char *argv[])
   //return EXIT_SUCCESS;
 
   //readed from commandline/config 
-  std::string RefFile        = "../../Materials/ParkScene_1920x1080_24_10bps_cf444_bt709.yuv";
-  std::string TestFile       = "../../Materials/ParkScene_1920x1080_24_10bps_cf422_bt709.yuv";
+  std::string RefFile        = "../../Materials/A97_SL_QP1_TT_v0_1920x1080_yuv420p10le.yuv";
+  std::string TestFile       = "../../Materials/A97_SL_QP2_TT_v0_1920x1080_yuv420p10le.yuv";
   //std::string OutputFile      = "../../Materials/Poznan_Street/Poznan_Street_00_1920x1088_tex_cam03_test.yuv";
   std::string KernelsFile     = "../kernels.cl";
   int32       PictureWidth    = 1920;
@@ -117,14 +118,14 @@ int32 main(int argc, char *argv[])
   if(VerboseLevel >= 1) { fmt::printf("FramesToProcess = %d\n", NumFrames); }
   fmt::printf("\n");
 
-  xSeq SequenceSrc(PictureWidth, PictureHeight, BitDepth, ChromaFormat);
-  //xSeq PictureTestYUV(PictureWidth, PictureHeight, BitDepth, ChromaFormat);
-  SequenceSrc.openFile(RefFile , xSeq::eMode::Read );
-  SequenceSrc.openFile(TestFile, xSeq::eMode::Read);
-  //PictureTestYUV.openFile(OutputFile, xSeq::eMode::Write);
+  xSeq SequenceRef(PictureWidth, PictureHeight, BitDepth, ChromaFormat);
+  xSeq SequenceTest(PictureWidth, PictureHeight, BitDepth, ChromaFormat);
+
+  SequenceRef.openFile(RefFile , xSeq::eMode::Read );
+  SequenceTest.openFile(TestFile, xSeq::eMode::Read);
 
   xPic PictureRefYUV(PictureWidth, PictureHeight, BitDepth, false);
-  xPic PictureDstYUV(PictureWidth, PictureHeight, BitDepth, false);
+  xPic PictureTestYUV(PictureWidth, PictureHeight, BitDepth, false);
 
   cl::Device Device = OpenCL.findMachingDevice(CL_DEVICE_TYPE_GPU, "Any", 120);
   if (Device() == nullptr) {
@@ -134,7 +135,7 @@ int32 main(int argc, char *argv[])
 
   xPSNR_OpenCL Processor;
   //Processor.setVerboseLevel(VerboseLevel);
-  bool Created = Processor.create(PictureWidth, PictureHeight, PictureRefYUV.getMargin(), KernelsFile, Device);
+  bool Created = Processor.create(PictureWidth, PictureHeight, PictureRefYUV.getMargin(), BitDepth, KernelsFile, Device);
   if(!Created) { return EXIT_FAILURE; }
   if(!Created) { return EXIT_FAILURE; }
 
@@ -151,10 +152,10 @@ int32 main(int argc, char *argv[])
     tTimePoint T0 = (VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
 
     //LOAD
-    bool ReadOKRef = SequenceSrc.readFrame(&PictureRefYUV);
+    bool ReadOKRef = SequenceRef.readFrame(&PictureRefYUV);
     if(!ReadOKRef) { fmt::printf("ERROR --> InputFile read error (%s)", RefFile); return EXIT_FAILURE; }
 
-    bool ReadOKTest = SequenceSrc.readFrame(&PictureRefYUV);
+    bool ReadOKTest = SequenceTest.readFrame(&PictureTestYUV);
     if(!ReadOKTest) { fmt::printf("ERROR --> InputFile read error (%s)", TestFile); return EXIT_FAILURE; }
 
     tTimePoint T1 = (VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
@@ -162,28 +163,27 @@ int32 main(int argc, char *argv[])
     //PROCESS
     //Processor.testCopyContent  (PictureDstYUV, PictureRefYUV);
     //Processor.testYUVtoRGBtoYUV(PictureDstYUV, PictureRefYUV);
-    Processor.processFrame(PictureRefYUV, PictureRefYUV);
+    Processor.processFrame(PictureRefYUV, PictureTestYUV); 
     
     tTimePoint T2 = (VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
 
-    //STORE
+  
 
-    //bool WriteOK = PictureTestYUV.writeFrame(&PictureDstYUV);
-    //if(!WriteOK) { fmt::printf("ERROR --> OutputFile write error (%s)", OutputFile); return EXIT_FAILURE; }
-
-    tTimePoint T3 = (VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
+    //tTimePoint T3 = (VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
 
     DurationLoad += (T1 - T0);
     DurationProc += (T2 - T1);
-    DurationStor += (T3 - T2);
+    //DurationStor += (T3 - T2);
 
     if(VerboseLevel >= 2) { fmt::printf("Frame %08d\n", f); }
   }
+  
+  Processor.printAvgPNSRStats(NumFrames);
 
-  //==============================================================================
+  //========================================NumFrames======================================
   //cleanup
-  SequenceSrc.closeFile();
-  //PictureTestYUV.closeFile();
+  SequenceRef.closeFile();
+  SequenceTest.closeFile();
 
   //==============================================================================
   //printout results
