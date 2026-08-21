@@ -1,19 +1,21 @@
 #pragma once
-#include "CommonDef.h"
-#include "xOpenCL_Common.h"
+#include "../../CommonDef.h"
+#include "../../xOpenCL_Common.h"
 #include <CL/opencl.hpp>
-#include "xPic.h"
+#include <array>
+#include "../../xPic.h"
+#include "xPSNR.h"
 //===============================================================================================================================================================================================================
 
-class xPSNR_OpenCL {
+class xPSNR_OpenCL : xPSNR{
 public:
     enum class eCopyMode {
         FullCopy,
     };
 
     enum class eKernelOp {
-        SSDSQRDIFF = 1,
-        SSDREDUCESUM = 2,
+        SSDSQRDIFF = 0,
+        SSDREDUCESUM = 1,
     };
 
     enum class colorSpace {
@@ -21,16 +23,15 @@ public:
         CB = 1,
         CR = 2,
     };
-
+    
+    flt64 GpuResultPSNRLm = 0;
+    flt64 GpuResultPSNRCb = 0;
+    flt64 GpuResultPSNRCr = 0;
+    
 protected:
-    int32 m_Width  = NOT_VALID;
-    int32 m_Height = NOT_VALID;
-    int32 m_Margin = NOT_VALID;
-    int32 m_Stride = NOT_VALID;
-    int32 m_BitDepth = NOT_VALID;
-
     int64 m_BuffSqrDiffNumBytes  = NOT_VALID;
     int32 m_BuffCmpNumBytes = NOT_VALID;
+    int32 m_BuffCmpNumPels = NOT_VALID;
 
     cl::Device       m_Device;
     cl::Context      m_Context;
@@ -44,9 +45,7 @@ protected:
     cl::Buffer m_BufferSqrDiff[3];
     cl::Buffer m_BufferTotalDiff[3];
 
-    float AvgtotalSqrDiffLm = 0;
-    float AvgtotalSqrDiffCb = 0;
-    float AvgtotalSqrDiffCr = 0;
+   
 
     tDuration DurationWriteBuff  = tDuration(0);
     tDuration DurationExecKernel = tDuration(0);
@@ -61,12 +60,16 @@ public:
         const std::string& KernelsFile, cl::Device& Device);
     
     void printTimeStats(int32  NumFrames);
-    void printPSNRStats(uint64 SqrDiff);
-    void printAvgPNSRStats(uint32_t NumFrames);
+    void printPSNRStats(uint64 SSD, uint8 colorSpace);
+    void printAvgPNSRStats(uint32 NumFrames);
     bool processFrame(xPic& Ref, xPic& Test);
-    
+
+    flt64 getGpuResultPSNRLm() { return GpuResultPSNRLm; }
+    flt64 getGpuResultPSNRCb() { return GpuResultPSNRCb; }
+    flt64 getGpuResultPSNRCr() { return GpuResultPSNRCr; }
+
+    void gpuAvgPSNR(uint32 NumFrames);
 protected:
-    //bool xRunKernel(xPic& Ref, xPic& Test, uint64& SqrDiff, eKernelOp KernelOp);
     bool xRunSquaredDiff(xPic& Ref, xPic& Test, uint8_t colorSpace);
     bool xRunReduceSum(uint64* SqrtDiff, uint8_t colorSpace);
 };

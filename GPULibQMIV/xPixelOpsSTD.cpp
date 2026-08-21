@@ -37,6 +37,7 @@
 
 
 #include "xPixelOpsSTD.h"
+#include "CommonDef.h"
 
 //===============================================================================================================================================================================================================
 
@@ -221,9 +222,12 @@ uint64 xPixelOpsSTD::CalcSSD(const uint16* restrict Org, const uint16* restrict 
 uint64 xPixelOpsSTD::CalcSSD(const uint16* restrict Org, const uint16* restrict Dist, int32 OStride, int32 DStride, int32 Width, int32 Height)
 {
   uint64 SAD = 0;
+  
   for(int32 y=0; y<Height; y++)
   {
-    for(int32 x=0; x<Width; x++) { SAD += (uint64)xPow2(((int32)Org[x]) - ((int32)Dist[x])); }
+    for(int32 x=0; x<Width; x++) { 
+      SAD += (uint64)xPow2(((int32)Org[x]) - ((int32)Dist[x]));  
+    }
     Org  += OStride;
     Dist += DStride;
   }

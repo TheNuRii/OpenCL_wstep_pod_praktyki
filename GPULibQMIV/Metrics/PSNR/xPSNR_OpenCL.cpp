@@ -1,18 +1,20 @@
 #include "xPSNR_OpenCL.h"
-#include "CommonDef.h"
-#include "lib_fmt/core.h"
-#include "lib_fmt/printf.h"
-#include "xFile.h"
-#include "xPic.h"
+#include "../../CommonDef.h"
+#include "../../lib_fmt/printf.h"
+#include "../../xFile.h"
+#include "../../xPic.h"
 #include <CL/cl.h>
 #include <CL/cl_platform.h>
 #include <CL/opencl.hpp>
+#include <array>
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <limits>
 #include <vector>
+#include "filesystem"
 
 bool xPSNR_OpenCL::create(int32 Width, int32 Height, int32 Margin, int32 BitDepth,
     const std::string& KernelFile, cl::Device& Device){
@@ -22,9 +24,11 @@ bool xPSNR_OpenCL::create(int32 Width, int32 Height, int32 Margin, int32 BitDept
     m_Margin = Margin;
     m_Stride = Width + (m_Margin << 1);
     m_BitDepth = BitDepth;
-
-    m_BuffCmpNumBytes         = (size_t)m_Width * m_Height * sizeof(uint16);
-    m_BuffSqrDiffNumBytes     = (size_t)m_Width * m_Height * sizeof(uint64);
+    
+    m_BuffCmpNumPels  = (m_Width + (m_Margin << 1)) * (m_Height + (m_Margin << 1));
+    m_BuffCmpNumBytes = m_BuffCmpNumPels * sizeof(uint16);
+    //m_BuffCmpNumBytes       = (size_t)m_Width * m_Height * sizeof(uint16);
+    m_BuffSqrDiffNumBytes     = m_Height * sizeof(uint64);
 
     m_Device = Device;
     // crate context
@@ -35,7 +39,8 @@ bool xPSNR_OpenCL::create(int32 Width, int32 Height, int32 Margin, int32 BitDept
 
     fmt::printf("Processing kernels.cl\n");
     if (!xFile::exist(KernelFile)) {
-        fmt::printf("ERROR - kernel file does not exist - %s\n", KernelFile);
+        std::filesystem::path CurrentPath = std::filesystem::current_path();
+        fmt::printf("ERROR - kernel file does not exist in this dir: %s | %s", CurrentPath, KernelFile);
         return false; 
     }
 
@@ -71,18 +76,18 @@ bool xPSNR_OpenCL::create(int32 Width, int32 Height, int32 Margin, int32 BitDept
 
     m_Kernels[(int32)eKernelOp::SSDSQRDIFF] = cl::Kernel(m_Program, "SSDPartialSum", &Result);
     if (Result != CL_SUCCESS) { 
-        fmt::printf("ERROR - kernel PartialSum - %d\n", Result);
+        fmt::printf("ERROR - kernel SSDPartialSum - %d\n", Result);
         return false;
     }
 
-    m_Kernels[(int32)eKernelOp::SSDREDUCESUM]     = cl::Kernel(m_Program, "SSDReduceSum", &Result);
+    m_Kernels[(int32)eKernelOp::SSDREDUCESUM]     = cl::Kernel(m_Program, "SSDReductionSum", &Result);
     if (Result != CL_SUCCESS) { 
-        fmt::printf("ERROR - kernel PsnrReduceSum - %d\n", Result);
+        fmt::printf("ERROR - kernel SSDReductionSum - %d\n", Result);
         return false;
     }
     
     // create command queue
-    m_Queue = cl::CommandQueue(m_Context, m_Device, 0, &Result);
+    m_Queue = cl::CommandQueue(m_Context, m_Device, CL_QUEUE_PROFILING_ENABLE, &Result);
     if (Result != CL_SUCCESS) {
         fmt::printf("ERROR - queue = %d\n", Result);
         return false;
@@ -135,6 +140,12 @@ bool xPSNR_OpenCL::create(int32 Width, int32 Height, int32 Margin, int32 BitDept
 
 // =================================================================================================================================================================================================================
 bool xPSNR_OpenCL::xRunSquaredDiff(xPic& Ref, xPic& Test, uint8_t colorSpce) {
+    //dla testow czy dane rozwiazanie dziala
+    //Ref.zero();
+    //Ref.fill(2);
+    //Test.zero();
+    //Test.fill(1);
+
     cl_int Result = CL_SUCCESS;
     tTimePoint T0 = (m_VerboseLevel >= 1) ? tClock::now() : tTimePoint::min();
 
@@ -143,7 +154,10 @@ bool xPSNR_OpenCL::xRunSquaredDiff(xPic& Ref, xPic& Test, uint8_t colorSpce) {
 
     Result = m_Queue.enqueueWriteBuffer(m_BufferTest[colorSpce], false, 0, m_BuffCmpNumBytes, Test.getBuffer(colorSpce));
     if (Result != CL_SUCCESS) { fmt::printf("ERROR - enqueueWriteBuffer Test - %d\n", Result); return false; }
-
+    // To do: SYNC BUFORRRY
+    Result = m_Queue.finish();
+    if (Result != CL_SUCCESS) { fmt::printf("ERROR - finsh - %d\n", Result); return false; }
+    
     tTimePoint T1 = (m_VerboseLevel >= 1) ? tClock::now() : tTimePoint::min();
 
     cl::Kernel& K = m_Kernels[(uint32_t)eKernelOp::SSDSQRDIFF];
@@ -151,17 +165,23 @@ bool xPSNR_OpenCL::xRunSquaredDiff(xPic& Ref, xPic& Test, uint8_t colorSpce) {
     K.setArg(1, m_BufferTest[colorSpce]);
     K.setArg(2, m_BufferSqrDiff[colorSpce]);
     K.setArg(3,  m_Width);
+    K.setArg(4, m_Height);
+    K.setArg(5, m_Margin);
+    K.setArg(6, m_Stride);
 
     Result = m_Queue.enqueueNDRangeKernel(K, cl::NullRange, cl::NDRange(m_Height), cl::NullRange);
     if (Result != CL_SUCCESS) { fmt::printf("ERROR - enqueueNDRangeKernel SQRDIFF - %d\n", Result); return false; }
-
+    // To Do: MUSI SIE SKONCZYC KERNEL
+    Result = m_Queue.finish();
+    if (Result != CL_SUCCESS) { fmt::printf("ERROR - finsh - %d\n", Result); return false; }
+   
     tTimePoint T2 = (m_VerboseLevel >= 1) ? tClock::now() : tTimePoint::min();
-    m_Queue.finish();
 
     if (m_VerboseLevel >= 1) {
         DurationWriteBuff  += T1 - T0;
         DurationExecKernel += T2 - T1;
     }
+
     return true;
 }
 
@@ -169,8 +189,8 @@ bool xPSNR_OpenCL::xRunReduceSum(uint64* SqrDiff, uint8_t colorSpace) {
     cl_int Result = CL_SUCCESS;
 
     cl_ulong zero = 0;
-    m_Queue.enqueueFillBuffer(m_BufferTotalDiff[colorSpace], zero, 0, sizeof(cl_ulong));
-
+    Result = m_Queue.enqueueFillBuffer(m_BufferTotalDiff[colorSpace], zero, 0, sizeof(cl_ulong));
+    if (Result != CL_SUCCESS) { fmt::printf("ERROR - enqueueFillBuffer - %d\n", Result); return false;}
 
     cl::Kernel& K = m_Kernels[(int32)eKernelOp::SSDREDUCESUM];
     K.setArg(0, m_BufferSqrDiff[colorSpace]);
@@ -178,11 +198,13 @@ bool xPSNR_OpenCL::xRunReduceSum(uint64* SqrDiff, uint8_t colorSpace) {
     K.setArg(2, (uint32_t)m_Height);
 
     Result = m_Queue.enqueueNDRangeKernel(K, cl::NullRange, cl::NDRange(1), cl::NullRange);
-    if (Result != CL_SUCCESS) { fmt::printf("ERROR - enqueueNDRangeKernel SDD - %d\n", Result); return false; }
+    if (Result != CL_SUCCESS) { fmt::printf("ERROR - enqueueNDRangeKernel SSDREDUCESUM - %d\n", Result); return false; }
 
     tTimePoint T2 = (m_VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
 
     m_Queue.enqueueReadBuffer(m_BufferTotalDiff[colorSpace], true, 0, sizeof(cl_ulong), SqrDiff);
+    Result = m_Queue.finish();
+    if (Result != CL_SUCCESS) { fmt::printf("ERROR - finsh - %d\n", Result); return false; }
 
     tTimePoint T3 = (m_VerboseLevel >= 1) ? tClock::now() : tTimePoint::min();
     if (m_VerboseLevel >= 1) { DurationReadBuff += T3 - T2; }
@@ -192,71 +214,59 @@ bool xPSNR_OpenCL::xRunReduceSum(uint64* SqrDiff, uint8_t colorSpace) {
 // =================================================================================================================================================================================================================
 
 bool xPSNR_OpenCL::processFrame(xPic& Ref, xPic& Test) {
+    cl_int Result = CL_SUCCESS;
     if (!xRunSquaredDiff(Ref, Test, (uint8_t)colorSpace::LM)) {return false;}
+    
     if (!xRunSquaredDiff(Ref, Test, (uint8_t)colorSpace::CB)) {return false;}
+    
     if (!xRunSquaredDiff(Ref, Test, (uint8_t)colorSpace::CR)) {return false;}
+   
+  std::array<uint64, 3> SSD{};
+
+    if (!xRunReduceSum(
+        SSD.data() + static_cast<size_t>(colorSpace::LM),
+        static_cast<uint8_t>(colorSpace::LM))) {return false;}
+
+    if (!xRunReduceSum(
+        SSD.data() + static_cast<size_t>(colorSpace::CB),
+        static_cast<uint8_t>(colorSpace::CB))) {return false;}
+
+    if (!xRunReduceSum(
+        SSD.data() + static_cast<size_t>(colorSpace::CR),
+        static_cast<uint8_t>(colorSpace::CR))) {return false;}
     
+    std::vector<flt64> PSNR(3);
 
-    //uint64_t sumRef = 0, sumTest = 0;
-    //const ushort* refData  = (const ushort*)Ref.getBuffer((uint8_t)colorSpace::LM);
-    //const ushort* testData = (const ushort*)Test.getBuffer((uint8_t)colorSpace::LM);
-    //for (size_t i = 0; i < m_Width * m_Height; i++) { sumRef += refData[i]; sumTest += testData[i]; }
-    //fmt::printf("sumRef=%llu sumTest=%llu\n", sumRef, sumTest);
-    //uint64* SqrDiffLm = 0;
-    //uint64* SqrDiffCb = 0; 
-    //uint64* SqrDiffCr = 0;
-    //if(!xRunReduceSum(SqrDiffLm, (uint8_t)colorSpace::LM)) {return false;}
+    for (int32 CmpIdx = 0; CmpIdx < 3; CmpIdx++)
+    {
+        uint64_t NumPoints = (uint64_t)m_Width * m_Height;
+        uint64_t MaxVal    = (uint64_t)(pow(2.0, m_BitDepth) - 1);
+        flt64 MAX          = NumPoints * (MaxVal * MaxVal);
 
-    std::vector<cl_ulong>  rowSumsLM(m_Height);
-    std::vector<cl_ulong>  rowSumsCB(m_Height);
-    std::vector<cl_ulong>  rowSumsCR(m_Height);
-    m_Queue.enqueueReadBuffer(m_BufferSqrDiff[(uint8_t)colorSpace::LM], true, 0, 
-                            sizeof(cl_long)*m_Height, rowSumsLM.data());
-
-    m_Queue.enqueueReadBuffer(m_BufferSqrDiff[(uint8_t)colorSpace::CB], true, 0, 
-                            sizeof(cl_long)*m_Height, rowSumsCB.data());
-
-    m_Queue.enqueueReadBuffer(m_BufferSqrDiff[(uint8_t)colorSpace::CR], true, 0, 
-                            sizeof(cl_long)*m_Height, rowSumsCR.data());
-    
-
-    uint64_t totalSqrDiffLm = 0;
-    uint64_t totalSqrDiffCb = 0;
-    uint64_t totalSqrDiffCr = 0;
-    
-    for (auto v : rowSumsLM) totalSqrDiffLm += v;
-    for (auto v : rowSumsCB) totalSqrDiffCb += v;
-    for (auto v : rowSumsCR) totalSqrDiffCr += v;
-
-    
-    fmt::print("PSNR: ");
-    printPSNRStats(totalSqrDiffLm);
-    fmt::print(" | ");
-    printPSNRStats(totalSqrDiffCb);
-    fmt::print(" | ");
-    printPSNRStats(totalSqrDiffCr);
-    fmt::print(" | ");
-
-
-    AvgtotalSqrDiffLm += totalSqrDiffLm;
-    AvgtotalSqrDiffCb += totalSqrDiffCb;
-    AvgtotalSqrDiffCr += totalSqrDiffCr;
-
-    // prep buff to acumulet Squared Diff another frame
-    cl_ulong zero = 0;
-    for (uint32 c = 0; c < 3; c++) {
-        m_Queue.enqueueFillBuffer(m_BufferTotalDiff[c], zero, 0, sizeof(cl_ulong));
+        PSNR[CmpIdx] = (SSD[CmpIdx] > 0)
+            ? 10.0 * std::log10(MAX / SSD[CmpIdx])
+            : std::numeric_limits<double>::infinity();
     }
+
+    
+    fmt::printf("GPU: LM %8.4f db |CB %8.4f dB |CR %8.4f dB ", PSNR[0], PSNR[1], PSNR[2]);
+
+    GpuResultPSNRLm += PSNR[0];
+    GpuResultPSNRCb += PSNR[1];
+    GpuResultPSNRCr += PSNR[2];
+
     return true;
 }
 
 // =================================================================================================================================================================================================================
-void xPSNR_OpenCL::printPSNRStats(uint64 SSD) {
 
-    uint64_t NumPoints  = (uint64_t)m_Width * m_Height;
-    uint64_t MaxVal     = (uint64_t)(pow(2.0, m_BitDepth) - 1);
-    float MAX           = NumPoints * (MaxVal * MaxVal);
-    float psnr          = (SSD > 0.0) ? 10.0 * std::log10(MAX / SSD) 
+void xPSNR_OpenCL::printPSNRStats(uint64 SSD, uint8 coloSpace) {
+    //fmt::printf("%f", SSD);
+
+    uint64_t NumPoints     = (uint64_t)m_Width * m_Height;
+    uint64_t MaxVal        = (uint64_t)(pow(2.0, m_BitDepth) - 1);
+    flt64    MAX           = NumPoints * (MaxVal * MaxVal);
+    flt64    psnr          = (SSD > 0.0) ? 10.0 * std::log10(MAX / SSD) 
                                         : std::numeric_limits<double>::infinity();
     
     fmt::printf(" %f dB", psnr);
@@ -268,19 +278,9 @@ void xPSNR_OpenCL::printTimeStats(int32 NumFrames)
   fmt::printf("AvgTime ExecKernel %9.2f ms\n", std::chrono::duration_cast<tDurationMS>(DurationExecKernel).count() / NumFrames);
   fmt::printf("AvgTime ReadBuff   %9.2f ms\n", std::chrono::duration_cast<tDurationMS>(DurationReadBuff  ).count() / NumFrames);
 }
-
-void xPSNR_OpenCL::printAvgPNSRStats(uint32_t NumFrames) {
-    float LM = AvgtotalSqrDiffLm / NumFrames;
-    float CB = AvgtotalSqrDiffCb / NumFrames;
-    float CR = AvgtotalSqrDiffCr / NumFrames;
-
-    fmt::printf("\n\nAvgPSNR: ");
-    printPSNRStats(LM);
-    fmt::printf(" | ");
-    printPSNRStats(CB);
-    fmt::printf(" | ");
-    printPSNRStats(CR);
-    fmt::printf("\n");     
+void xPSNR_OpenCL::gpuAvgPSNR(uint32 NumFrames) {
+    GpuResultPSNRLm = GpuResultPSNRLm / NumFrames;
+    GpuResultPSNRCb = GpuResultPSNRCb / NumFrames;
+    GpuResultPSNRCr = GpuResultPSNRCr / NumFrames; 
 }
-
 // =================================================================================================================================================================================================================

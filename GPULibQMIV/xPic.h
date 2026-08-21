@@ -81,6 +81,8 @@ public:
   bool   check     (const std::string& Name);
   void   extend    ();
   void   interleave();
+  void   fill      (uint16 value);
+  void   zero      ();
 
 public:
   inline int32 getWidth   () const { return m_Width           ; }
@@ -105,5 +107,6 @@ public:
   inline uint16*       getBuffer(uint32 CmpIdx)       { return m_BufferPlanar[CmpIdx]; }
   inline const uint16* getBuffer(uint32 CmpIdx) const { return m_BufferPlanar[CmpIdx]; }
 };
-
 //===============================================================================================================================================================================================================
+ 
+ 

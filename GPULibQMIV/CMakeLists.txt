@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
-set(PROJECT_NAME "PP07")
+set(PROJECT_NAME "GPULQ")
 project(${PROJECT_NAME})
 
 # force static runtime libraries for msvc builds
@@ -69,11 +69,14 @@ set(PROJECT_SOURCES
   xOpenCL_Common.h
   xOpenCL_Enumerator.h xOpenCL_Enumerator.cpp
   PP.cpp
+  xPrintStats.cpp xPrintStats.h
   # Sepia_OpenCL.h xSepia_OpenCL.cpp
   #xSepia.h  xSepia.cpp 
 
-  xPSNR_OpenCL.h xPSNR_OpenCL.cpp
-  xPSNR.h  xPSNR.cpp
+  ./Metrics/PSNR/xPSNR_OpenCL.h 
+  ./Metrics/PSNR/xPSNR_OpenCL.cpp
+  ./Metrics/PSNR/xPSNR.h  
+  ./Metrics/PSNR/xPSNR.cpp
 )
 
 source_group("Source Files" FILES ${PROJECT_SOURCES})

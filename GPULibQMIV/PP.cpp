@@ -37,14 +37,21 @@
 
 //===============================================================================================================================================================================================================
 
+#include "CommonDef.h"
+#include "lib_fmt/core.h"
 #include "lib_fmt/printf.h"
 #include "xFile.h"
 #include "xPic.h"
-#include "xSeq.h"
+#include <cstdio>
 #include <math.h>
 #include <cassert>
+#include <string>
 #include "xOpenCL_Enumerator.h"
-#include "xPSNR_OpenCL.h"
+#include "./Metrics/PSNR/xPSNR_OpenCL.h"
+#include "xPixelOps.h"
+#include "xSeq.h"
+#include "./Metrics/PSNR/xPSNR.h"
+#include "xPrintStats.h"
 
 //===============================================================================================================================================================================================================
 
@@ -61,12 +68,13 @@ int32 main(int argc, char *argv[])
   std::string RefFile        = "../../Materials/A97_SL_QP1_TT_v0_1920x1080_yuv420p10le.yuv";
   std::string TestFile       = "../../Materials/A97_SL_QP2_TT_v0_1920x1080_yuv420p10le.yuv";
   //std::string OutputFile      = "../../Materials/Poznan_Street/Poznan_Street_00_1920x1088_tex_cam03_test.yuv";
-  std::string KernelsFile     = "../kernels.cl";
+  std::string PSNRKernelsFile     = "../Metrics/PSNR/kernels.cl";
+  std::string SSIMKernelsFile    = "../Metrics/SSIM/kernels.cl";
   int32       PictureWidth    = 1920;
-  int32       PictureHeight   = 1088;
+  int32       PictureHeight   = 1080;
   int32       BitDepth        = 8   ;  
   int32       ChromaFormat    = 420 ;
-  int32       NumberOfFrames  = -1  ;  
+  int32       NumberOfFrames  = -1 ;  
   int32       NumberOfThreads = -1  ;
   int32       VerboseLevel    = 4   ;
 
@@ -85,7 +93,7 @@ int32 main(int argc, char *argv[])
     fmt::printf("Configuration:\n");
     fmt::printf("InputFile       = %s\n", RefFile        );
     fmt::printf("OutputFile      = %s\n", TestFile        );
-    fmt::printf("KernelsFile     = %s\n", KernelsFile      );
+    fmt::printf("KernelsFile     = %s\n", PSNRKernelsFile      );
     fmt::printf("PictureWidth    = %d\n", PictureWidth     );
     fmt::printf("PictureHeight   = %d\n", PictureHeight    );
     fmt::printf("BitDepth        = %d\n", BitDepth         );
@@ -133,14 +141,16 @@ int32 main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
 
-  xPSNR_OpenCL Processor;
+  xPSNR_OpenCL GPU;
+  xPSNR        CPU;
   //Processor.setVerboseLevel(VerboseLevel);
-  bool Created = Processor.create(PictureWidth, PictureHeight, PictureRefYUV.getMargin(), BitDepth, KernelsFile, Device);
+  bool Created = GPU.create(PictureWidth, PictureHeight, PictureRefYUV.getMargin(), BitDepth, PSNRKernelsFile, Device);
   if(!Created) { return EXIT_FAILURE; }
   if(!Created) { return EXIT_FAILURE; }
 
   //==============================================================================
   //running
+  
   if(VerboseLevel >= 2) { fmt::printf("Running:\n"); }
 
   tDuration DurationLoad = tDuration(0);
@@ -149,6 +159,7 @@ int32 main(int argc, char *argv[])
 
   for(int32 f = 0; f < NumFrames; f++)
   {
+    
     tTimePoint T0 = (VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
 
     //LOAD
@@ -159,29 +170,40 @@ int32 main(int argc, char *argv[])
     if(!ReadOKTest) { fmt::printf("ERROR --> InputFile read error (%s)", TestFile); return EXIT_FAILURE; }
 
     tTimePoint T1 = (VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
-
+    
     //PROCESS
-    //Processor.testCopyContent  (PictureDstYUV, PictureRefYUV);
-    //Processor.testYUVtoRGBtoYUV(PictureDstYUV, PictureRefYUV);
-    Processor.processFrame(PictureRefYUV, PictureTestYUV); 
+    if(VerboseLevel >= 2) { fmt::printf("Frame %08d\n", f); }
+    GPU.processFrame(PictureRefYUV, PictureTestYUV);
+    CPU.cpuCalPSNR(PictureRefYUV, PictureTestYUV);
+    //uint64 test = xPixelOpsSTD::CalcSSD(PictureRefYUV.getAddr(0), PictureTestYUV.getAddr(0), PictureRefYUV.getStride(), PictureTestYUV.getStride(), PictureWidth, PictureHeight);
+    //fmt::printf("CPU SSD[0] = %llu\n", (unsigned long long)test);
+    fmt::print("_______________________________________________\n");
     
     tTimePoint T2 = (VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
-
-  
-
+    
     //tTimePoint T3 = (VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
 
     DurationLoad += (T1 - T0);
     DurationProc += (T2 - T1);
-    //DurationStor += (T3 - T2);
-
-    if(VerboseLevel >= 2) { fmt::printf("Frame %08d\n", f); }
+    //DurationStor += (T3 - T2);    
   }
-  
-  Processor.printAvgPNSRStats(NumFrames);
-
+  //Processor.printAvgPNSRStats(NumFrames);
   //========================================NumFrames======================================
-  //cleanup
+  GPU.gpuAvgPSNR(NumFrames);
+  CPU.cpuAvgPNSR(NumFrames);
+  
+  xPrintStats PrintStats;
+
+  PrintStats.printPSNRTable(
+    NumFrames,
+    GPU.getGpuResultPSNRLm(),
+    GPU.getGpuResultPSNRCb(),
+    GPU.getGpuResultPSNRCr(),
+    CPU.getCpuResultPSNRLm(),
+    CPU.getCpuResultPSNRCb(),
+    CPU.getCpuResultPSNRCr()
+  );
+      //cleanup
   SequenceRef.closeFile();
   SequenceTest.closeFile();
 
@@ -193,7 +215,7 @@ int32 main(int argc, char *argv[])
     fmt::printf("AvgTime LOAD %9.2f ms\n", std::chrono::duration_cast<tDurationMS>(DurationLoad).count() / NumFrames); 
     fmt::printf("AvgTime PROC %9.2f ms\n", std::chrono::duration_cast<tDurationMS>(DurationProc).count() / NumFrames);
     fmt::printf("AvgTime STOR %9.2f ms\n", std::chrono::duration_cast<tDurationMS>(DurationStor).count() / NumFrames);
-    Processor.printTimeStats(NumFrames);
+    GPU.printTimeStats(NumFrames);
   }
   fmt::printf("\n");
   fmt::printf("NumFrames %d\n", NumFrames);

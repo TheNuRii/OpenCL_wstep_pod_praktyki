@@ -1,7 +1,7 @@
 #pragma once
-#include "../CommonDef.h"
-#include "../xPic.h"
-#include "../xThreadPool.h"
+#include "../../CommonDef.h"
+#include "../../xPic.h"
+#include "../../xThreadPool.h"
 
 //===============================================================================================================================================================================================================
 // nie trzeba bo tylko PSNR wyliczam, a oba pliki są .yuv, więc nie ma potrzeby konwersji YUV --> RGB --> YUV

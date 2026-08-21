@@ -36,6 +36,7 @@
  //                   Poznan University of Technology, Poznań, Poland
 
 #include "xPic.h"
+#include "CommonDef.h"
 #include "xPixelOps.h"
 #include <cassert>
 #include <cstring>
@@ -117,6 +118,28 @@ void xPic::interleave()
   const int32 ExtWidth  = m_Width  + (m_Margin << 1);
   const int32 ExtHeight = m_Height + (m_Margin << 1);
   xPixelOps::Interleave(m_BufferInterleaved, m_BufferPlanar[0], m_BufferPlanar[1], m_BufferPlanar[2], 0, m_Stride << 2, m_Stride, ExtWidth, ExtHeight);
+}
+
+// TO DO: zerowanie bufora
+void xPic::zero() {
+  for (uint32 CmpIdx = 0; CmpIdx < 0; CmpIdx++){
+    std::memset(m_BufferPlanar[CmpIdx], 0, m_BuffCmpNumBytes);
+  }
+}
+
+//TO DO fill juz po wyzrowaniu calego bufora obraz (value)
+void xPic::fill(uint16 value) {
+  for(uint32 CmpIdx = 0; CmpIdx < 3; CmpIdx++) {
+    uint16* buffer = m_BufferPlanar[CmpIdx];
+
+    for (uint32 y = 0; y < m_Height; y++){
+      uint16* row = buffer + (y + m_Margin)* m_Stride + m_Margin;
+      
+      for (uint32 x = 0; x < m_Width; x++){
+        row[x] = value;
+      }
+    }
+  }
 }
 
 //=============================================================================================================================================================================
