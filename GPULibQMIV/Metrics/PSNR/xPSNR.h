@@ -17,12 +17,17 @@ public:
     flt64 CpuResultPSNRCb = 0;
     flt64 CpuResultPSNRCr = 0;
 
+    tDuration DurationCpuCalcSSD = tDuration(0);
+
 protected:
     int32 m_Width       = NOT_VALID;
     int32 m_Height      = NOT_VALID;
     int32 m_Margin      = NOT_VALID;
     int32 m_Stride      = NOT_VALID;
     int32 m_BitDepth    = NOT_VALID;
+
+    int32        m_VerboseLevel  = 1;
+    const int32  m_NumComponents = 3;
 
 public: 
     void  cpuCalPSNR(xPic& Ref, xPic& Test);

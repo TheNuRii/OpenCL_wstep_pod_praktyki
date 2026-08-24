@@ -13,7 +13,8 @@ void xPSNR::cpuCalPSNR(xPic& Ref, xPic& Test)
 
     std::vector<uint64_t> SSD(3);
 
-    
+    tTimePoint T0 = (m_VerboseLevel >= 1) ? tClock::now() : tTimePoint::min();
+
     for (uint32 CmpIdx = 0; CmpIdx < 3; CmpIdx++)
     {
         SSD[CmpIdx] = xPixelOpsSTD::CalcSSD(
@@ -25,6 +26,8 @@ void xPSNR::cpuCalPSNR(xPic& Ref, xPic& Test)
             m_Height
         );
     }
+
+    tTimePoint T1 = (m_VerboseLevel >= 1) ? tClock::now() : tTimePoint::min();
 
     std::vector<flt64> PSNR(3);
 
@@ -46,6 +49,10 @@ void xPSNR::cpuCalPSNR(xPic& Ref, xPic& Test)
     CpuResultPSNRLm += PSNR[0];
     CpuResultPSNRCb += PSNR[1];
     CpuResultPSNRCr += PSNR[2];
+
+    if (m_VerboseLevel >= 1) {
+        DurationCpuCalcSSD += T1 - T0;
+    }
 }
 
 void xPSNR::cpuAvgPNSR(uint32 NumFrames) {

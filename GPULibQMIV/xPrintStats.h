@@ -14,4 +14,13 @@ public:
         flt64 CpuLm,
         flt64 CpuCb,
         flt64 CpuCr);
+    static void printTimeTable(
+        uint32 Frame,
+        flt64 GpuCopyBuff,
+        flt64 GpuExecKernelSqrDiff,
+        flt64 GpuExecKernelReduce,
+        flt64 GpuReadBuff,
+        flt64 GpuFillBuff,
+        std::string kerneltype,
+        tDuration CpuDuration);
 };

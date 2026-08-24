@@ -147,17 +147,34 @@ bool xPSNR_OpenCL::xRunSquaredDiff(xPic& Ref, xPic& Test, uint8_t colorSpce) {
     //Test.fill(1);
 
     cl_int Result = CL_SUCCESS;
+    cl::Event eventWriteRefBuff;
+    cl::Event eventWrietTestBuff;
+    cl::Event eventKernelSqrDiff;
+    cl_ulong start = 0, end = 0;
     tTimePoint T0 = (m_VerboseLevel >= 1) ? tClock::now() : tTimePoint::min();
 
-    Result = m_Queue.enqueueWriteBuffer(m_BufferRef[colorSpce], false, 0, m_BuffCmpNumBytes, Ref.getBuffer(colorSpce));
+    Result = m_Queue.enqueueWriteBuffer(m_BufferRef[colorSpce], false, 0, m_BuffCmpNumBytes, Ref.getBuffer(colorSpce), nullptr, &eventWriteRefBuff);
     if (Result != CL_SUCCESS) { fmt::printf("ERROR - enqueueWriteBuffer Ref - %d\n", Result); return false; }
 
-    Result = m_Queue.enqueueWriteBuffer(m_BufferTest[colorSpce], false, 0, m_BuffCmpNumBytes, Test.getBuffer(colorSpce));
+    eventWriteRefBuff.wait();    
+    if (Result != CL_SUCCESS) { fmt::printf("ERROR - finsh - %d\n", Result); return false; }
+
+    eventWriteRefBuff.getProfilingInfo(CL_PROFILING_COMMAND_START, &start); // zwraca czas rozpoczecia i zakonczenia operacji w nanosekundach
+    eventWriteRefBuff.getProfilingInfo(CL_PROFILING_COMMAND_END, &end);     // w formie znaczników czasowch
+    TimeCopyBuff += static_cast<double>(end - start) / 1000000.0;                       // z nano przejscie do milisekun dla tego dzielimy
+
+    Result = m_Queue.enqueueWriteBuffer(m_BufferTest[colorSpce], false, 0, m_BuffCmpNumBytes, Test.getBuffer(colorSpce), nullptr, &eventWrietTestBuff);
     if (Result != CL_SUCCESS) { fmt::printf("ERROR - enqueueWriteBuffer Test - %d\n", Result); return false; }
+    
     // To do: SYNC BUFORRRY
     Result = m_Queue.finish();
     if (Result != CL_SUCCESS) { fmt::printf("ERROR - finsh - %d\n", Result); return false; }
-    
+
+    start = 0, end = 0;
+    eventWrietTestBuff.getProfilingInfo(CL_PROFILING_COMMAND_START, &start); // zwraca czas rozpoczecia i zakonczenia operacji w nanosekundach
+    eventWrietTestBuff.getProfilingInfo(CL_PROFILING_COMMAND_END, &end);    // w formie znaczników czasowch
+    TimeCopyBuff += static_cast<double>(end - start) / 1000000.0;                       // z nano przejscie do milisekun dla tego dzielimy
+
     tTimePoint T1 = (m_VerboseLevel >= 1) ? tClock::now() : tTimePoint::min();
 
     cl::Kernel& K = m_Kernels[(uint32_t)eKernelOp::SSDSQRDIFF];
@@ -169,12 +186,18 @@ bool xPSNR_OpenCL::xRunSquaredDiff(xPic& Ref, xPic& Test, uint8_t colorSpce) {
     K.setArg(5, m_Margin);
     K.setArg(6, m_Stride);
 
-    Result = m_Queue.enqueueNDRangeKernel(K, cl::NullRange, cl::NDRange(m_Height), cl::NullRange);
+    
+    Result = m_Queue.enqueueNDRangeKernel(K, cl::NullRange, cl::NDRange(m_Height), cl::NullRange, nullptr, &eventKernelSqrDiff);
     if (Result != CL_SUCCESS) { fmt::printf("ERROR - enqueueNDRangeKernel SQRDIFF - %d\n", Result); return false; }
     // To Do: MUSI SIE SKONCZYC KERNEL
     Result = m_Queue.finish();
     if (Result != CL_SUCCESS) { fmt::printf("ERROR - finsh - %d\n", Result); return false; }
    
+    start = 0, end = 0;
+    eventKernelSqrDiff.getProfilingInfo(CL_PROFILING_COMMAND_START, &start);
+    eventKernelSqrDiff.getProfilingInfo(CL_PROFILING_COMMAND_END, &end);
+    TimeExecKernelSqrDiff += static_cast<double>(end - start) / 1000000.0;              // z nano przejscie do milisekun dla tego dzielimy
+    
     tTimePoint T2 = (m_VerboseLevel >= 1) ? tClock::now() : tTimePoint::min();
 
     if (m_VerboseLevel >= 1) {
@@ -187,24 +210,42 @@ bool xPSNR_OpenCL::xRunSquaredDiff(xPic& Ref, xPic& Test, uint8_t colorSpce) {
 
 bool xPSNR_OpenCL::xRunReduceSum(uint64* SqrDiff, uint8_t colorSpace) {
     cl_int Result = CL_SUCCESS;
+    cl::Event eventFillBuff;
+    cl::Event eventKernel;
+    cl::Event eventReadBuff;
+    cl_ulong start = 0, end = 0;
 
     cl_ulong zero = 0;
-    Result = m_Queue.enqueueFillBuffer(m_BufferTotalDiff[colorSpace], zero, 0, sizeof(cl_ulong));
+    Result = m_Queue.enqueueFillBuffer(m_BufferTotalDiff[colorSpace], zero, 0, sizeof(cl_ulong), nullptr, &eventFillBuff);
     if (Result != CL_SUCCESS) { fmt::printf("ERROR - enqueueFillBuffer - %d\n", Result); return false;}
+
+    eventFillBuff.wait();
+    eventFillBuff.getProfilingInfo(CL_PROFILING_COMMAND_START, &start);
+    eventFillBuff.getProfilingInfo(CL_PROFILING_COMMAND_END, &end);
+    TimeFillBuff += static_cast<double>(end - start) / 1000000.0;                   // z nano przejscie do milisekun dla tego dzielimy
 
     cl::Kernel& K = m_Kernels[(int32)eKernelOp::SSDREDUCESUM];
     K.setArg(0, m_BufferSqrDiff[colorSpace]);
     K.setArg(1, m_BufferTotalDiff[colorSpace]);
     K.setArg(2, (uint32_t)m_Height);
 
-    Result = m_Queue.enqueueNDRangeKernel(K, cl::NullRange, cl::NDRange(1), cl::NullRange);
+    Result = m_Queue.enqueueNDRangeKernel(K, cl::NullRange, cl::NDRange(1), cl::NullRange, nullptr, &eventKernel);
     if (Result != CL_SUCCESS) { fmt::printf("ERROR - enqueueNDRangeKernel SSDREDUCESUM - %d\n", Result); return false; }
+
+    eventKernel.wait();
+    eventKernel.getProfilingInfo(CL_PROFILING_COMMAND_START, &start);
+    eventKernel.getProfilingInfo(CL_PROFILING_COMMAND_END, &end);
+    TimeExecKernelReduce += static_cast<double>(end - start) / 1000000.0;       // z nano przejscie do milisekun dla tego dzielimy
 
     tTimePoint T2 = (m_VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
 
-    m_Queue.enqueueReadBuffer(m_BufferTotalDiff[colorSpace], true, 0, sizeof(cl_ulong), SqrDiff);
+    m_Queue.enqueueReadBuffer(m_BufferTotalDiff[colorSpace], true, 0, sizeof(cl_ulong), SqrDiff, nullptr, &eventReadBuff);
     Result = m_Queue.finish();
     if (Result != CL_SUCCESS) { fmt::printf("ERROR - finsh - %d\n", Result); return false; }
+
+    eventReadBuff.getProfilingInfo(CL_PROFILING_COMMAND_START, &start);
+    eventReadBuff.getProfilingInfo(CL_PROFILING_COMMAND_END, &end);
+    TimeReadBuff += static_cast<double>(end - start) / 1000000.0;
 
     tTimePoint T3 = (m_VerboseLevel >= 1) ? tClock::now() : tTimePoint::min();
     if (m_VerboseLevel >= 1) { DurationReadBuff += T3 - T2; }
@@ -274,9 +315,10 @@ void xPSNR_OpenCL::printPSNRStats(uint64 SSD, uint8 coloSpace) {
 
 void xPSNR_OpenCL::printTimeStats(int32 NumFrames)
 {
-  fmt::printf("AvgTime WriteBuff  %9.2f ms\n", std::chrono::duration_cast<tDurationMS>(DurationWriteBuff ).count() / NumFrames);
-  fmt::printf("AvgTime ExecKernel %9.2f ms\n", std::chrono::duration_cast<tDurationMS>(DurationExecKernel).count() / NumFrames);
-  fmt::printf("AvgTime ReadBuff   %9.2f ms\n", std::chrono::duration_cast<tDurationMS>(DurationReadBuff  ).count() / NumFrames);
+  fmt::printf("AvgTime WriteBuff  %9.4f ms\n", TimeCopyBuff / NumFrames);
+  fmt::printf("AvgTime ExecKernel SqrDiff %9.4f ms\n", TimeExecKernelSqrDiff / NumFrames);
+  fmt::printf("AvgTime ExecKernel Reduce %9.4f ms\n", TimeExecKernelReduce / NumFrames);
+  fmt::printf("AvgTime ReadBuff   %9.4f ms\n", TimeReadBuff / NumFrames);
 }
 void xPSNR_OpenCL::gpuAvgPSNR(uint32 NumFrames) {
     GpuResultPSNRLm = GpuResultPSNRLm / NumFrames;

@@ -42,21 +42,17 @@
 #include "lib_fmt/printf.h"
 #include "xFile.h"
 #include "xPic.h"
-#include <cstdio>
 #include <math.h>
 #include <cassert>
 #include <string>
 #include "xOpenCL_Enumerator.h"
 #include "./Metrics/PSNR/xPSNR_OpenCL.h"
-#include "xPixelOps.h"
 #include "xSeq.h"
 #include "./Metrics/PSNR/xPSNR.h"
 #include "xPrintStats.h"
 
 //===============================================================================================================================================================================================================
-
-int32 main(int argc, char *argv[])
-{  
+int32 main(int argc, char *argv[]) {
   xOpenCL_Enumerator OpenCL;
 
   OpenCL.queryAllData();
@@ -192,6 +188,13 @@ int32 main(int argc, char *argv[])
   GPU.gpuAvgPSNR(NumFrames);
   CPU.cpuAvgPNSR(NumFrames);
   
+  //cleanup
+  SequenceRef.closeFile();
+  SequenceTest.closeFile();
+
+  //==============================================================================
+  //printout results
+
   xPrintStats PrintStats;
 
   PrintStats.printPSNRTable(
@@ -203,13 +206,19 @@ int32 main(int argc, char *argv[])
     CPU.getCpuResultPSNRCb(),
     CPU.getCpuResultPSNRCr()
   );
-      //cleanup
-  SequenceRef.closeFile();
-  SequenceTest.closeFile();
 
-  //==============================================================================
-  //printout results
+  PrintStats.printTimeTable(
+    NumFrames, 
+    GPU.getTimeCopyBuff(), 
+    GPU.getTimeExecKernelSqrDiff(), 
+    GPU.getTimeExecKernelReduce(), 
+    GPU.getTimeReadBuff(),
+    GPU.getTimeFillBuff(),
+    "PSNR 2 simple (for loop) kernels",
+    CPU.DurationCpuCalcSSD);
   fmt::printf("\n\n");
+
+  /*
   if(VerboseLevel >= 3)
   {
     fmt::printf("AvgTime LOAD %9.2f ms\n", std::chrono::duration_cast<tDurationMS>(DurationLoad).count() / NumFrames); 
@@ -217,6 +226,8 @@ int32 main(int argc, char *argv[])
     fmt::printf("AvgTime STOR %9.2f ms\n", std::chrono::duration_cast<tDurationMS>(DurationStor).count() / NumFrames);
     GPU.printTimeStats(NumFrames);
   }
+  */
+
   fmt::printf("\n");
   fmt::printf("NumFrames %d\n", NumFrames);
   fmt::printf("END-OF-LOG\n");
