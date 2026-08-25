@@ -77,6 +77,11 @@ set(PROJECT_SOURCES
   ./Metrics/PSNR/xPSNR_OpenCL.cpp
   ./Metrics/PSNR/xPSNR.h  
   ./Metrics/PSNR/xPSNR.cpp
+
+  ./Metrics/SSIM/xSSIM_OpenCL.h
+  ./Metrics/SSIM/xSSIM_OpenCL.cpp
+  ./Metrics/SSIM/xSSIM.h
+  ./Metrics/SSIM/xSSIM.cpp
 )
 
 source_group("Source Files" FILES ${PROJECT_SOURCES})

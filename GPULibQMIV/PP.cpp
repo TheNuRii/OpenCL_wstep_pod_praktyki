@@ -38,6 +38,7 @@
 //===============================================================================================================================================================================================================
 
 #include "CommonDef.h"
+#include "Metrics/SSIM/xSSIM.h"
 #include "lib_fmt/core.h"
 #include "lib_fmt/printf.h"
 #include "xFile.h"
@@ -139,8 +140,10 @@ int32 main(int argc, char *argv[]) {
 
   xPSNR_OpenCL GPU;
   xPSNR        CPU;
+  xSSIM        CPUSSIM;
   //Processor.setVerboseLevel(VerboseLevel);
-  bool Created = GPU.create(PictureWidth, PictureHeight, PictureRefYUV.getMargin(), BitDepth, PSNRKernelsFile, Device);
+  //bool Created = GPU.create(PictureWidth, PictureHeight, PictureRefYUV.getMargin(), BitDepth, PSNRKernelsFile, Device);
+bool Created = CPUSSIM.create(PictureRefYUV, PictureTestYUV);
   if(!Created) { return EXIT_FAILURE; }
   if(!Created) { return EXIT_FAILURE; }
 
@@ -153,7 +156,7 @@ int32 main(int argc, char *argv[]) {
   tDuration DurationProc = tDuration(0);
   tDuration DurationStor = tDuration(0);
 
-  for(int32 f = 0; f < NumFrames; f++)
+  for(int32 f = 0; f < 1; f++)
   {
     
     tTimePoint T0 = (VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
@@ -169,10 +172,11 @@ int32 main(int argc, char *argv[]) {
     
     //PROCESS
     if(VerboseLevel >= 2) { fmt::printf("Frame %08d\n", f); }
-    GPU.processFrame(PictureRefYUV, PictureTestYUV);
-    CPU.cpuCalPSNR(PictureRefYUV, PictureTestYUV);
+    //GPU.processFrame(PictureRefYUV, PictureTestYUV);
+    //CPU.cpuCalPSNR(PictureRefYUV, PictureTestYUV);
     //uint64 test = xPixelOpsSTD::CalcSSD(PictureRefYUV.getAddr(0), PictureTestYUV.getAddr(0), PictureRefYUV.getStride(), PictureTestYUV.getStride(), PictureWidth, PictureHeight);
     //fmt::printf("CPU SSD[0] = %llu\n", (unsigned long long)test);
+    CPUSSIM.processFrame(PictureRefYUV, PictureTestYUV);
     fmt::print("_______________________________________________\n");
     
     tTimePoint T2 = (VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
@@ -185,8 +189,8 @@ int32 main(int argc, char *argv[]) {
   }
   //Processor.printAvgPNSRStats(NumFrames);
   //========================================NumFrames======================================
-  GPU.gpuAvgPSNR(NumFrames);
-  CPU.cpuAvgPNSR(NumFrames);
+  //GPU.gpuAvgPSNR(NumFrames);
+  //CPU.cpuAvgPNSR(NumFrames);
   
   //cleanup
   SequenceRef.closeFile();

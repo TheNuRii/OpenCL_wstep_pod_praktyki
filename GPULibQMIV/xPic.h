@@ -50,7 +50,7 @@
 class xPic
 {
 protected:
-  static constexpr int32 c_DefMargin = 4;
+  static constexpr int32 c_DefMargin = 8;
 
 protected:
   int32   m_Width           = NOT_VALID;
