@@ -69,7 +69,7 @@ public:
     flt64 getGpuResultPSNRCb()  { return GpuResultPSNRCb; }
     flt64 getGpuResultPSNRCr()  { return GpuResultPSNRCr; }
 
-    flt64 getTimeCopyBuff()    { return TimeCopyBuff; }
+    flt64 getTimeCopyBuff()     { return TimeCopyBuff; }
     flt64 getTimeExecKernelSqrDiff()   { return TimeExecKernelSqrDiff; }
     flt64 getTimeExecKernelReduce()   { return TimeExecKernelReduce; }
     flt64 getTimeReadBuff()     { return TimeReadBuff; }

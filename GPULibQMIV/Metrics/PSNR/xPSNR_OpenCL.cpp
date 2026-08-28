@@ -9,6 +9,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -187,7 +188,8 @@ bool xPSNR_OpenCL::xRunSquaredDiff(xPic& Ref, xPic& Test, uint8_t colorSpce) {
     K.setArg(6, m_Stride);
 
     
-    Result = m_Queue.enqueueNDRangeKernel(K, cl::NullRange, cl::NDRange(m_Height), cl::NullRange, nullptr, &eventKernelSqrDiff);
+    Result = m_Queue.enqueueNDRangeKernel(K, cl::NullRange, cl::NDRange(m_Height), 
+    cl::NullRange, nullptr, &eventKernelSqrDiff);
     if (Result != CL_SUCCESS) { fmt::printf("ERROR - enqueueNDRangeKernel SQRDIFF - %d\n", Result); return false; }
     // To Do: MUSI SIE SKONCZYC KERNEL
     Result = m_Queue.finish();
@@ -232,6 +234,7 @@ bool xPSNR_OpenCL::xRunReduceSum(uint64* SqrDiff, uint8_t colorSpace) {
     Result = m_Queue.enqueueNDRangeKernel(K, cl::NullRange, cl::NDRange(1), cl::NullRange, nullptr, &eventKernel);
     if (Result != CL_SUCCESS) { fmt::printf("ERROR - enqueueNDRangeKernel SSDREDUCESUM - %d\n", Result); return false; }
 
+    start = 0, end = 0;
     eventKernel.wait();
     eventKernel.getProfilingInfo(CL_PROFILING_COMMAND_START, &start);
     eventKernel.getProfilingInfo(CL_PROFILING_COMMAND_END, &end);
@@ -239,9 +242,10 @@ bool xPSNR_OpenCL::xRunReduceSum(uint64* SqrDiff, uint8_t colorSpace) {
 
     tTimePoint T2 = (m_VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
 
-    m_Queue.enqueueReadBuffer(m_BufferTotalDiff[colorSpace], true, 0, sizeof(cl_ulong), SqrDiff, nullptr, &eventReadBuff);
-    Result = m_Queue.finish();
-    if (Result != CL_SUCCESS) { fmt::printf("ERROR - finsh - %d\n", Result); return false; }
+    Result = m_Queue.enqueueReadBuffer(m_BufferTotalDiff[colorSpace], true, 0, sizeof(cl_ulong), SqrDiff, nullptr, &eventReadBuff);
+    
+    eventReadBuff.wait();
+    if (Result != CL_SUCCESS) {fmt::printf("ERROR - wait Read buf - %d\n"); return false;}
 
     eventReadBuff.getProfilingInfo(CL_PROFILING_COMMAND_START, &start);
     eventReadBuff.getProfilingInfo(CL_PROFILING_COMMAND_END, &end);
@@ -252,7 +256,7 @@ bool xPSNR_OpenCL::xRunReduceSum(uint64* SqrDiff, uint8_t colorSpace) {
 
     return true;
 }
-// =================================================================================================================================================================================================================
+// ============================================================================== ===================================================================================================================================
 
 bool xPSNR_OpenCL::processFrame(xPic& Ref, xPic& Test) {
     cl_int Result = CL_SUCCESS;

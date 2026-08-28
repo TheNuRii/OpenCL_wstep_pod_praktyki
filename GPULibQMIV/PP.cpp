@@ -39,6 +39,7 @@
 
 #include "CommonDef.h"
 #include "Metrics/SSIM/xSSIM.h"
+#include "Metrics/SSIM/xSSIM_OpenCL.h"
 #include "lib_fmt/core.h"
 #include "lib_fmt/printf.h"
 #include "xFile.h"
@@ -66,7 +67,7 @@ int32 main(int argc, char *argv[]) {
   std::string TestFile       = "../../Materials/A97_SL_QP2_TT_v0_1920x1080_yuv420p10le.yuv";
   //std::string OutputFile      = "../../Materials/Poznan_Street/Poznan_Street_00_1920x1088_tex_cam03_test.yuv";
   std::string PSNRKernelsFile     = "../Metrics/PSNR/kernels.cl";
-  std::string SSIMKernelsFile    = "../Metrics/SSIM/kernels.cl";
+  std::string SSIMKernelsFile    = "../Metrics/SSIM/SSIMkernels.cl";
   int32       PictureWidth    = 1920;
   int32       PictureHeight   = 1080;
   int32       BitDepth        = 8   ;  
@@ -74,6 +75,7 @@ int32 main(int argc, char *argv[]) {
   int32       NumberOfFrames  = -1 ;  
   int32       NumberOfThreads = -1  ;
   int32       VerboseLevel    = 4   ;
+  int32       BlockSize       = 11;
 
 /*
 //check OpenMP
@@ -98,6 +100,7 @@ int32 main(int argc, char *argv[]) {
     fmt::printf("NumberOfFrames  = %d%s\n", NumberOfFrames, NumberOfFrames==NOT_VALID ? "  (all)" : "");
     //fmt::printf("NumberOfThreads = %d%s\n", FinalNumberOfThreads, NumberOfThreads == NOT_VALID ? "  (all)" : "");
     fmt::printf("VerboseLevel    = %d\n", VerboseLevel     );
+    fmt::printf("Block Size SSIM = %d\n", BlockSize);
     fmt::printf("\n");
   }
 
@@ -141,11 +144,17 @@ int32 main(int argc, char *argv[]) {
   xPSNR_OpenCL GPU;
   xPSNR        CPU;
   xSSIM        CPUSSIM;
+  xSSIM_OpenCl GPUSSIM;
   //Processor.setVerboseLevel(VerboseLevel);
   //bool Created = GPU.create(PictureWidth, PictureHeight, PictureRefYUV.getMargin(), BitDepth, PSNRKernelsFile, Device);
-bool Created = CPUSSIM.create(PictureRefYUV, PictureTestYUV);
-  if(!Created) { return EXIT_FAILURE; }
-  if(!Created) { return EXIT_FAILURE; }
+bool CreatedCPU = CPUSSIM.create(PictureRefYUV, PictureTestYUV);
+  if(!CreatedCPU) { return EXIT_FAILURE; }
+  if(!CreatedCPU) { return EXIT_FAILURE; }
+
+bool CreatedGPU = GPUSSIM.create(PictureWidth, PictureHeight, 
+  PictureRefYUV.getMargin(), BitDepth, BlockSize,SSIMKernelsFile, Device);
+  if(!CreatedGPU) { return EXIT_FAILURE; }
+  if(!CreatedGPU) { return EXIT_FAILURE; }
 
   //==============================================================================
   //running
@@ -156,7 +165,7 @@ bool Created = CPUSSIM.create(PictureRefYUV, PictureTestYUV);
   tDuration DurationProc = tDuration(0);
   tDuration DurationStor = tDuration(0);
 
-  for(int32 f = 0; f < 1; f++)
+  for(int32 f = 0; f < NumFrames; f++)
   {
     
     tTimePoint T0 = (VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
@@ -177,6 +186,7 @@ bool Created = CPUSSIM.create(PictureRefYUV, PictureTestYUV);
     //uint64 test = xPixelOpsSTD::CalcSSD(PictureRefYUV.getAddr(0), PictureTestYUV.getAddr(0), PictureRefYUV.getStride(), PictureTestYUV.getStride(), PictureWidth, PictureHeight);
     //fmt::printf("CPU SSD[0] = %llu\n", (unsigned long long)test);
     CPUSSIM.processFrame(PictureRefYUV, PictureTestYUV);
+    GPUSSIM.processFrame(PictureRefYUV, PictureTestYUV);
     fmt::print("_______________________________________________\n");
     
     tTimePoint T2 = (VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();

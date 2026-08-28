@@ -12,7 +12,7 @@ bool xSSIM::create(xPic& PicRef, xPic& PicTest){
     m_DynamicRange = (1 << m_BitDepth) - 1;
     m_C1 = (0.01 * m_DynamicRange)*(0.01 * m_DynamicRange); // 0.01 is param k1 form wikipedia
     m_C2 = (0.03 * m_DynamicRange)*(0.03 * m_DynamicRange); // 0.03 is param k2 form wikipedia
-    m_C3 = static_cast<flt32>(m_C2) / 2;  
+    //m_C3 = static_cast<flt32>(m_C2) / 2;  
 
     // RESIZEING: chandge margins (pic buffors), for block size of compute
    
@@ -63,22 +63,22 @@ xSSIM::SSIMStats xSSIM::calcStats(const uint16* X, const uint16* Y){
         }
     }
 
-    const flt64 meanX =
-        static_cast<flt64>(sumX) / N;
+    const flt32 meanX =
+        static_cast<flt32>(sumX) / N;
 
-    const flt64 meanY =
-        static_cast<flt64>(sumY) / N;
+    const flt32 meanY =
+        static_cast<flt32>(sumY) / N;
 
-    const flt64 varX =
-        (static_cast<flt64>(sumX2) - static_cast<flt64>(sumX) * meanX)
+    const flt32 varX =
+        (static_cast<flt32>(sumX2) - static_cast<flt32>(sumX) * meanX)
         / (N - 1);
 
-    const flt64 varY =
-        (static_cast<flt64>(sumY2) - static_cast<flt64>(sumY) * meanY)
+    const flt32 varY =
+        (static_cast<flt32>(sumY2) - static_cast<flt32>(sumY) * meanY)
         / (N - 1);
 
-    const flt64 covXY =
-        (static_cast<flt64>(sumXY) - static_cast<flt64>(sumX) * meanY)
+    const flt32 covXY =
+        (static_cast<flt32>(sumXY) - static_cast<flt32>(sumX) * meanY)
         / (N - 1);
 
     return {
@@ -89,13 +89,13 @@ xSSIM::SSIMStats xSSIM::calcStats(const uint16* X, const uint16* Y){
         covXY
     };
 }
-flt64 xSSIM::calcSSIM(const SSIMStats& s)
+flt32 xSSIM::calcSSIM(const SSIMStats& s)
 {
-    const flt64 numerator =
+    const flt32 numerator =
         (2.0 * s.MeanX * s.MeanY + m_C1) *
         (2.0 * s.CovXY + m_C2);
 
-    const flt64 denominator =
+    const flt32 denominator =
         (s.MeanX * s.MeanX + s.MeanY * s.MeanY + m_C1) *
         (s.VarX + s.VarY + m_C2);
 
@@ -114,7 +114,7 @@ void xSSIM::processFrame(xPic& PicRef, xPic& PicTest)
         const uint16* TestPic =
             PicTest.getAddr(CmpIdx);
 
-        flt64 FrameSSIM = 0.0;
+        flt32 FrameSSIM = 0.0;
 
         for (int32 y = 0; y < m_Height; y++)
         {
@@ -136,7 +136,7 @@ void xSSIM::processFrame(xPic& PicRef, xPic& PicTest)
 
         SSIMResultCPU[CmpIdx] =
             FrameSSIM /
-            (static_cast<flt64>(m_Width) * m_Height);
+            (static_cast<flt32>(m_Width) * m_Height);
     }
 
     fmt::printf(
