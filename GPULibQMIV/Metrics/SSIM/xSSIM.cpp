@@ -106,6 +106,8 @@ void xSSIM::processFrame(xPic& PicRef, xPic& PicTest)
 {
     const int32 Radius = m_BlockSize / 2;
 
+    tTimePoint T0 = (m_VerboseLevel >= 1) ? tClock::now() : tTimePoint::min();
+
     for (int32 CmpIdx = 0; CmpIdx < 3; CmpIdx++)
     {
         const uint16* RefPic =
@@ -137,6 +139,12 @@ void xSSIM::processFrame(xPic& PicRef, xPic& PicTest)
         SSIMResultCPU[CmpIdx] =
             FrameSSIM /
             (static_cast<flt32>(m_Width) * m_Height);
+    }
+
+    tTimePoint T1 = (m_VerboseLevel >= 1) ? tClock::now() : tTimePoint::min();
+
+      if (m_VerboseLevel >= 1) {
+        DurationCpuCalcSSIM += T1 - T0;
     }
 
     fmt::printf(

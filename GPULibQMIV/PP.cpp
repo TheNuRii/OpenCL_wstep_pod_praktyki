@@ -85,7 +85,7 @@ int32 main(int argc, char *argv[]) {
   int32 FinalNumberOfThreads = 0;
 #endif
 */
-
+//
   //print config
   if(VerboseLevel >= 1)
   {
@@ -111,12 +111,12 @@ int32 main(int argc, char *argv[]) {
   // Ref file load
   if(!xFile::exist(RefFile)) { fmt::printf("ERROR --> InputFile does not exist (%s)", RefFile); return EXIT_FAILURE; }
   int64 SizeOfRefFile = xFile::filesize(RefFile);
-  if(VerboseLevel >= 1) { fmt::printf("SizeOfInputFile = %d\n", SizeOfRefFile); }
+  if(VerboseLevel >= 1) { fmt::printf("SizeOfRefFile = %d\n", SizeOfRefFile); }
   
   // Test file load
   if(!xFile::exist(TestFile)) { fmt::printf("ERROR --> InputFile does not exist (%s)", TestFile); return EXIT_FAILURE; }
-  int64 SizeOfTestFile = xFile::filesize(RefFile);
-  if(VerboseLevel >= 1) { fmt::printf("SizeOfInputFile = %d\n", SizeOfTestFile); }
+  int64 SizeOfTestFile = xFile::filesize(TestFile);
+  if(VerboseLevel >= 1) { fmt::printf("SizeOfTestFile = %d\n", SizeOfTestFile); }
   
   int32 NumOfFrames = xSeq::calcNumFramesInFile(PictureWidth, PictureHeight, BitDepth, ChromaFormat, SizeOfRefFile);
   if(VerboseLevel >= 1) { fmt::printf("DetectedFrames  = %d\n", NumOfFrames); }
@@ -210,8 +210,8 @@ bool CreatedGPU = GPUSSIM.create(PictureWidth, PictureHeight,
   //printout results
 
   xPrintStats PrintStats;
-
-  PrintStats.printPSNRTable(
+/*
+  PrintStats.printTablePSNR(
     NumFrames,
     GPU.getGpuResultPSNRLm(),
     GPU.getGpuResultPSNRCb(),
@@ -221,7 +221,7 @@ bool CreatedGPU = GPUSSIM.create(PictureWidth, PictureHeight,
     CPU.getCpuResultPSNRCr()
   );
 
-  PrintStats.printTimeTable(
+  PrintStats.printTimeTablePSNR(
     NumFrames, 
     GPU.getTimeCopyBuff(), 
     GPU.getTimeExecKernelSqrDiff(), 
@@ -231,6 +231,28 @@ bool CreatedGPU = GPUSSIM.create(PictureWidth, PictureHeight,
     "PSNR 2 simple (for loop) kernels",
     CPU.DurationCpuCalcSSD);
   fmt::printf("\n\n");
+  
+  */
+  PrintStats.printTableSSINM(
+    NumFrames, 
+    GPUSSIM.SSIMResultGPU[0], 
+    GPUSSIM.SSIMResultGPU[1], 
+    GPUSSIM.SSIMResultGPU[2],
+    CPUSSIM.SSIMResultCPU[0], 
+    CPUSSIM.SSIMResultCPU[1], 
+    CPUSSIM.SSIMResultCPU[2]
+  );
+
+  PrintStats.printTimeTableSSIM(
+    NumFrames, 
+    GPUSSIM.getTimeCopyBuff(), 
+    GPUSSIM.getTimeReadBuff(),
+    GPUSSIM.getTimeExecKernelProcesBlock(), 
+    GPUSSIM.getTimeExecKernelProcesLine(), 
+    GPUSSIM.getTimeExecKernelReduceSum(), 
+    "SSIM", 
+    CPUSSIM.DurationCpuCalcSSIM 
+  );
 
   /*
   if(VerboseLevel >= 3)

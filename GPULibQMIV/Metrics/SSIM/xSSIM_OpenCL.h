@@ -34,7 +34,7 @@ protected:
     double  TimeExecKernelProcesLine    = 0;
     double  TimeExecKernelReduceSum     = 0;
     double  TimeReadBuff                = 0;
-    double  TimeFillBuff                = 0;
+    //double  TimeFillBuff                = 0;
 public:
 
     bool create(int32 Width, int32 Height, int32 Margin, int32 BitDepth, int32 BlockSize,
@@ -45,4 +45,10 @@ public:
     bool xRunProcesBlock(xPic& PicRef, xPic& PicTest, uint8 colorSpace);
     bool xRunProcesLine(uint8 colorSpace);
     bool xRunReduceSum(flt32* FrameSSIM, uint8 colorSpace);
+
+    double getTimeCopyBuff() {return TimeCopyBuff;}
+    double getTimeReadBuff() {return TimeReadBuff;}
+    double getTimeExecKernelProcesBlock() {return TimeExecKernelProcesBlock;}
+    double getTimeExecKernelProcesLine()  {return TimeExecKernelProcesLine;}
+    double getTimeExecKernelReduceSum()    {return TimeExecKernelReduceSum;}
 };
