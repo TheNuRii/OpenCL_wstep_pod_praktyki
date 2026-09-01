@@ -16,7 +16,6 @@ public:
         flt64 CpuCr);
 
      static void printTableSSINM(
-        uint32 Frame,
         flt64 GpuLm,
         flt64 GpuCb,
         flt64 GpuCr,
@@ -35,12 +34,11 @@ public:
         tDuration CpuDuration);
 
     static void printTimeTableSSIM(
-        uint32 Frame,
         flt64 GpuCopyBuff,
         flt64 GpuReadBuff,
         flt64 GpuExecKernelProcesBlock,
         flt64 GpuExecKernelProcesLine,
         flt64 GpuExecKernelReduceSum,
         std::string kerneltype,
-        tDuration CpuDuration);
+        flt64 CpuDuration);
 };

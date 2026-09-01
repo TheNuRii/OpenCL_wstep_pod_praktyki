@@ -30,7 +30,7 @@ protected:
     const int32  m_NumComponents = 3;
 
 public: 
-    void  cpuCalPSNR(xPic& Ref, xPic& Test);
+    void  processFrame(xPic& Ref, xPic& Test);
     void  cpuAvgPNSR(uint32 NumFrames);
 
     flt64 getCpuResultPSNRLm() { return CpuResultPSNRLm; }

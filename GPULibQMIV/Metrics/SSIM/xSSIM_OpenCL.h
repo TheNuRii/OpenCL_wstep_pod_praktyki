@@ -7,9 +7,10 @@
 #include "filesystem"
 
 class xSSIM_OpenCl : xSSIM {
-public:
-    std::array<flt32, 3> SSIMResultGPU;
 protected:
+    std::array<flt32, 3> SSIMResultGPU;
+    std::array<flt64, 3> SSIMSumGPU = {0.0, 0.0, 0.0}; 
+
     uint32 m_BuffCmpNumBytes         = NOT_VALID;
     uint32 m_BuffCmpNumPels          = NOT_VALID;
     uint32 m_BuffProcesLineNumBytes  = NOT_VALID;
@@ -34,10 +35,11 @@ protected:
     double  TimeExecKernelProcesLine    = 0;
     double  TimeExecKernelReduceSum     = 0;
     double  TimeReadBuff                = 0;
-    //double  TimeFillBuff                = 0;
+
 public:
 
-    bool create(int32 Width, int32 Height, int32 Margin, int32 BitDepth, int32 BlockSize,
+    bool create(int32 Width, int32 Height, int32 Margin, 
+        int32 BitDepth, int32 BlockSize, int32 Step,
         const std::string& KernelsFile, cl::Device& Device);
 
     bool processFrame(xPic& PicRef, xPic& PicTest);
@@ -46,9 +48,12 @@ public:
     bool xRunProcesLine(uint8 colorSpace);
     bool xRunReduceSum(flt32* FrameSSIM, uint8 colorSpace);
 
-    double getTimeCopyBuff() {return TimeCopyBuff;}
-    double getTimeReadBuff() {return TimeReadBuff;}
-    double getTimeExecKernelProcesBlock() {return TimeExecKernelProcesBlock;}
-    double getTimeExecKernelProcesLine()  {return TimeExecKernelProcesLine;}
-    double getTimeExecKernelReduceSum()    {return TimeExecKernelReduceSum;}
+    flt32 getAvgSSIM(int32 CmpIdx, int32 NumFrames) const { 
+        return static_cast<flt32>(SSIMSumGPU[CmpIdx] / NumFrames); }
+
+    flt64 getAvgTimeCopyBuff(int32 NumFrames)              const { return TimeCopyBuff / NumFrames; }
+    flt64 getAvgTimeReadBuff(int32 NumFrames)              const { return TimeReadBuff / NumFrames; }
+    flt64 getAvgTimeExecKernelProcesBlock(int32 NumFrames) const { return TimeExecKernelProcesBlock / NumFrames; }
+    flt64 getAvgTimeExecKernelProcesLine(int32 NumFrames)  const { return TimeExecKernelProcesLine / NumFrames; }
+    flt64 getAvgTimeExecKernelReduceSum(int32 NumFrames)   const { return TimeExecKernelReduceSum / NumFrames; }
 };

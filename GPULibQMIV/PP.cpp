@@ -61,31 +61,46 @@ int32 main(int argc, char *argv[]) {
   std::string ResultStr = OpenCL.printAllData(false);
   fmt::printf(ResultStr);
   //return EXIT_SUCCESS;
-
-  //readed from commandline/config 
+  
+  //readed from commandline/config
   std::string RefFile        = "../../Materials/A97_SL_QP1_TT_v0_1920x1080_yuv420p10le.yuv";
   std::string TestFile       = "../../Materials/A97_SL_QP2_TT_v0_1920x1080_yuv420p10le.yuv";
-  //std::string OutputFile      = "../../Materials/Poznan_Street/Poznan_Street_00_1920x1088_tex_cam03_test.yuv";
   std::string PSNRKernelsFile     = "../Metrics/PSNR/kernels.cl";
   std::string SSIMKernelsFile    = "../Metrics/SSIM/SSIMkernels.cl";
   int32       PictureWidth    = 1920;
   int32       PictureHeight   = 1080;
   int32       BitDepth        = 8   ;  
-  int32       ChromaFormat    = 420 ;
+  int32       ChromaFormat    = 444;
   int32       NumberOfFrames  = -1 ;  
   int32       NumberOfThreads = -1  ;
   int32       VerboseLevel    = 4   ;
-  int32       BlockSize       = 11;
+  int32       BlockSize       = 8;
+  int32       Step            = static_cast<int32>(BlockSize) / 2;
+  
+  // ref to metrics
+  xPSNR_OpenCL GPU_PSNR;
+  xPSNR        CPU_PSNR;
+  xSSIM        CPU_SSIM;
+  xSSIM_OpenCl GPU_SSIM;
 
-/*
-//check OpenMP
-#if defined(_OPENMP)
-  int32 FinalNumberOfThreads = NumberOfThreads < 0 ? std::thread::hardware_concurrency() : std::min<int32>(NumberOfThreads, std::thread::hardware_concurrency());
-#else
-  int32 FinalNumberOfThreads = 0;
-#endif
-*/
-//
+  // Simple steletin  metrics
+  enum eMetric : uint32 {
+    eMetric_PSNR    = 1u << 0,
+    eMetric_SSIM    = 1u << 1,
+    eMetric_IVPSNR  = 1u << 2, // TODO
+    eMetric_IVSSIM  = 1u << 3, // TODO
+  };
+  uint32 EnabledMetrics = eMetric_SSIM;
+
+  /*
+  //check OpenMP
+  #if defined(_OPENMP)
+    int32 FinalNumberOfThreads = NumberOfThreads < 0 ? std::thread::hardware_concurrency() : std::min<int32>(NumberOfThreads, std::thread::hardware_concurrency()); 
+  #else
+    int32 FinalNumberOfThreads = 0;
+  #endif
+  */
+
   //print config
   if(VerboseLevel >= 1)
   {
@@ -141,21 +156,19 @@ int32 main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  xPSNR_OpenCL GPU;
-  xPSNR        CPU;
-  xSSIM        CPUSSIM;
-  xSSIM_OpenCl GPUSSIM;
-  //Processor.setVerboseLevel(VerboseLevel);
-  //bool Created = GPU.create(PictureWidth, PictureHeight, PictureRefYUV.getMargin(), BitDepth, PSNRKernelsFile, Device);
-bool CreatedCPU = CPUSSIM.create(PictureRefYUV, PictureTestYUV);
-  if(!CreatedCPU) { return EXIT_FAILURE; }
-  if(!CreatedCPU) { return EXIT_FAILURE; }
+  // --------------------------------------------------------------------------------
+  // created instans of CPU and GPU 
+  bool CreatedCPU = true, CreatedGPU = true;
 
-bool CreatedGPU = GPUSSIM.create(PictureWidth, PictureHeight, 
-  PictureRefYUV.getMargin(), BitDepth, BlockSize,SSIMKernelsFile, Device);
-  if(!CreatedGPU) { return EXIT_FAILURE; }
-  if(!CreatedGPU) { return EXIT_FAILURE; }
+  if (EnabledMetrics & eMetric_SSIM){
+    CreatedCPU = CPU_SSIM.create(PictureWidth, PictureHeight,
+        PictureRefYUV.getMargin(), BitDepth, BlockSize, Step);
+    if(!CreatedCPU) { return EXIT_FAILURE; }
 
+    CreatedGPU = GPU_SSIM.create(PictureWidth, PictureHeight,
+        PictureRefYUV.getMargin(), BitDepth, BlockSize, Step, SSIMKernelsFile, Device);
+    if(!CreatedGPU) { return EXIT_FAILURE; }
+  }
   //==============================================================================
   //running
   
@@ -165,9 +178,9 @@ bool CreatedGPU = GPUSSIM.create(PictureWidth, PictureHeight,
   tDuration DurationProc = tDuration(0);
   tDuration DurationStor = tDuration(0);
 
-  for(int32 f = 0; f < NumFrames; f++)
-  {
-    
+  // for my laptop test NumFrame 3 
+  NumFrames = 3;
+  for(int32 f = 0; f < NumFrames; f++){
     tTimePoint T0 = (VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
 
     //LOAD
@@ -177,31 +190,37 @@ bool CreatedGPU = GPUSSIM.create(PictureWidth, PictureHeight,
     bool ReadOKTest = SequenceTest.readFrame(&PictureTestYUV);
     if(!ReadOKTest) { fmt::printf("ERROR --> InputFile read error (%s)", TestFile); return EXIT_FAILURE; }
 
+    // margines musi być odświeżony co klatkę, przed jakimkolwiek processFrame (CPU i GPU)
+    PictureRefYUV.extend();
+    PictureTestYUV.extend();
+
     tTimePoint T1 = (VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
-    
+
     //PROCESS
     if(VerboseLevel >= 2) { fmt::printf("Frame %08d\n", f); }
-    //GPU.processFrame(PictureRefYUV, PictureTestYUV);
-    //CPU.cpuCalPSNR(PictureRefYUV, PictureTestYUV);
-    //uint64 test = xPixelOpsSTD::CalcSSD(PictureRefYUV.getAddr(0), PictureTestYUV.getAddr(0), PictureRefYUV.getStride(), PictureTestYUV.getStride(), PictureWidth, PictureHeight);
-    //fmt::printf("CPU SSD[0] = %llu\n", (unsigned long long)test);
-    CPUSSIM.processFrame(PictureRefYUV, PictureTestYUV);
-    GPUSSIM.processFrame(PictureRefYUV, PictureTestYUV);
-    fmt::print("_______________________________________________\n");
-    
-    tTimePoint T2 = (VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
-    
-    //tTimePoint T3 = (VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
 
+    if (EnabledMetrics & eMetric_PSNR){
+      CPU_PSNR.processFrame(PictureRefYUV, PictureTestYUV);
+      GPU_PSNR.processFrame(PictureRefYUV, PictureTestYUV);
+    }
+
+    if (EnabledMetrics & eMetric_SSIM) {
+      CPU_SSIM.processFrame(PictureRefYUV, PictureTestYUV);
+      GPU_SSIM.processFrame(PictureRefYUV, PictureTestYUV);
+    }
+    
+    if (EnabledMetrics & eMetric_IVPSNR) {
+      // TODO
+    }
+
+    fmt::print("_______________________________________________\n");
+
+    tTimePoint T2 = (VerboseLevel >= 3) ? tClock::now() : tTimePoint::min();
     DurationLoad += (T1 - T0);
     DurationProc += (T2 - T1);
-    //DurationStor += (T3 - T2);    
   }
-  //Processor.printAvgPNSRStats(NumFrames);
-  //========================================NumFrames======================================
-  //GPU.gpuAvgPSNR(NumFrames);
-  //CPU.cpuAvgPNSR(NumFrames);
-  
+
+  //========================================NumFrames======================================  
   //cleanup
   SequenceRef.closeFile();
   SequenceTest.closeFile();
@@ -210,59 +229,57 @@ bool CreatedGPU = GPUSSIM.create(PictureWidth, PictureHeight,
   //printout results
 
   xPrintStats PrintStats;
-/*
-  PrintStats.printTablePSNR(
+
+  // ===================================================================
+  // PSNR
+  if (EnabledMetrics & eMetric_PSNR) {
+    PrintStats.printTablePSNR(
     NumFrames,
-    GPU.getGpuResultPSNRLm(),
-    GPU.getGpuResultPSNRCb(),
-    GPU.getGpuResultPSNRCr(),
-    CPU.getCpuResultPSNRLm(),
-    CPU.getCpuResultPSNRCb(),
-    CPU.getCpuResultPSNRCr()
-  );
+    GPU_PSNR.getGpuResultPSNRLm(),
+    GPU_PSNR.getGpuResultPSNRCb(),
+    GPU_PSNR.getGpuResultPSNRCr(),
+    CPU_PSNR.getCpuResultPSNRLm(),
+    CPU_PSNR.getCpuResultPSNRCb(),
+    CPU_PSNR.getCpuResultPSNRCr()
+    );
 
-  PrintStats.printTimeTablePSNR(
+    PrintStats.printTimeTablePSNR(
     NumFrames, 
-    GPU.getTimeCopyBuff(), 
-    GPU.getTimeExecKernelSqrDiff(), 
-    GPU.getTimeExecKernelReduce(), 
-    GPU.getTimeReadBuff(),
-    GPU.getTimeFillBuff(),
+    GPU_PSNR.getTimeCopyBuff(), 
+    GPU_PSNR.getTimeExecKernelSqrDiff(), 
+    GPU_PSNR.getTimeExecKernelReduce(), 
+    GPU_PSNR.getTimeReadBuff(),
+    GPU_PSNR.getTimeFillBuff(),
     "PSNR 2 simple (for loop) kernels",
-    CPU.DurationCpuCalcSSD);
-  fmt::printf("\n\n");
-  
-  */
-  PrintStats.printTableSSINM(
-    NumFrames, 
-    GPUSSIM.SSIMResultGPU[0], 
-    GPUSSIM.SSIMResultGPU[1], 
-    GPUSSIM.SSIMResultGPU[2],
-    CPUSSIM.SSIMResultCPU[0], 
-    CPUSSIM.SSIMResultCPU[1], 
-    CPUSSIM.SSIMResultCPU[2]
-  );
+    CPU_PSNR.DurationCpuCalcSSD
+    );
+    fmt::printf("\n\n");
+  }
 
-  PrintStats.printTimeTableSSIM(
-    NumFrames, 
-    GPUSSIM.getTimeCopyBuff(), 
-    GPUSSIM.getTimeReadBuff(),
-    GPUSSIM.getTimeExecKernelProcesBlock(), 
-    GPUSSIM.getTimeExecKernelProcesLine(), 
-    GPUSSIM.getTimeExecKernelReduceSum(), 
-    "SSIM", 
-    CPUSSIM.DurationCpuCalcSSIM 
-  );
+  if (EnabledMetrics & eMetric_SSIM) {
+    PrintStats.printTableSSINM(
+    GPU_SSIM.getAvgSSIM(0, NumFrames), GPU_SSIM.getAvgSSIM(1, NumFrames), GPU_SSIM.getAvgSSIM(2, NumFrames),
+    CPU_SSIM.getAvgSSIM(0, NumFrames), CPU_SSIM.getAvgSSIM(1, NumFrames), CPU_SSIM.getAvgSSIM(2, NumFrames)
+    );
 
-  /*
+
+    PrintStats.printTimeTableSSIM(
+    GPU_SSIM.getAvgTimeCopyBuff(NumFrames),
+    GPU_SSIM.getAvgTimeReadBuff(NumFrames),
+    GPU_SSIM.getAvgTimeExecKernelProcesBlock(NumFrames),
+    GPU_SSIM.getAvgTimeExecKernelProcesLine(NumFrames),
+    GPU_SSIM.getAvgTimeExecKernelReduceSum(NumFrames),
+    "SSIM",
+    CPU_SSIM.getAvgTimeMs(NumFrames)
+    );
+  }
+
   if(VerboseLevel >= 3)
   {
     fmt::printf("AvgTime LOAD %9.2f ms\n", std::chrono::duration_cast<tDurationMS>(DurationLoad).count() / NumFrames); 
     fmt::printf("AvgTime PROC %9.2f ms\n", std::chrono::duration_cast<tDurationMS>(DurationProc).count() / NumFrames);
     fmt::printf("AvgTime STOR %9.2f ms\n", std::chrono::duration_cast<tDurationMS>(DurationStor).count() / NumFrames);
-    GPU.printTimeStats(NumFrames);
   }
-  */
 
   fmt::printf("\n");
   fmt::printf("NumFrames %d\n", NumFrames);

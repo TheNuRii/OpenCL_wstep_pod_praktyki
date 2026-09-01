@@ -3,7 +3,7 @@
 #include <vector>
 #include "../../lib_fmt/printf.h"
 
-void xPSNR::cpuCalPSNR(xPic& Ref, xPic& Test)
+void xPSNR::processFrame(xPic& Ref, xPic& Test)
 {   
     m_Width    = Ref.getWidth();
     m_Height   = Ref.getHeight();

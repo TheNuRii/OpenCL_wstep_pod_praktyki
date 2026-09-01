@@ -1,13 +1,18 @@
 #include "xSSIM.h"
 
-bool xSSIM::create(xPic& PicRef, xPic& PicTest){
+bool xSSIM::create(int32 Width, int32 Height, int32 Margin, 
+        int32 BitDepth, int32 BlockSize, int32 Step){
 
-    m_BlockSize = 11;
-    m_Width     = PicRef.getWidth();
-    m_Height    = PicRef.getHeight();
+    m_Width     = Width;
+    m_Height    = Height;
     m_Margin    = 8; // tyle by zabezpieczycz blok 11 x 11 na krancu obrazu
     m_Stride    = m_Width + (m_Margin << 1);
-    m_BitDepth  = PicRef.getBitDepth();
+    m_BitDepth  = BitDepth;
+    m_BlockSize = BlockSize;
+    m_Step      = Step;
+
+    m_BlocksWidth  = static_cast<int32>(m_Width  + m_Step - 1) / m_Step;
+    m_BlocksHeight = static_cast<int32>(m_Height + m_Step - 1) / m_Step;
 
     m_DynamicRange = (1 << m_BitDepth) - 1;
     m_C1 = (0.01 * m_DynamicRange)*(0.01 * m_DynamicRange); // 0.01 is param k1 form wikipedia
@@ -16,9 +21,9 @@ bool xSSIM::create(xPic& PicRef, xPic& PicTest){
 
     // RESIZEING: chandge margins (pic buffors), for block size of compute
    
-    uint16* addresRefPic  = nullptr;
-    uint16* addresTestPic = nullptr;
-    uint64 average;
+    //uint16* addresRefPic  = nullptr;
+    //uint16* addresTestPic = nullptr;
+    //uint64 average;
     // w zasadzie tutaj nie musilem tego robić w xPic zmienilem m_Margin z 4 na 8
     /*
     for (int32 CmpIdx = 0; CmpIdx < 3; CmpIdx++){
@@ -110,48 +115,31 @@ void xSSIM::processFrame(xPic& PicRef, xPic& PicTest)
 
     for (int32 CmpIdx = 0; CmpIdx < 3; CmpIdx++)
     {
-        const uint16* RefPic =
-            PicRef.getAddr(CmpIdx);
-
-        const uint16* TestPic =
-            PicTest.getAddr(CmpIdx);
+        const uint16* RefPic  = PicRef.getAddr(CmpIdx);
+        const uint16* TestPic = PicTest.getAddr(CmpIdx);
 
         flt32 FrameSSIM = 0.0;
 
-        for (int32 y = 0; y < m_Height; y++)
+        for (int32 y = 0; y < m_Height; y += m_Step)
         {
-            for (int32 x = 0; x < m_Width; x++)
+            for (int32 x = 0; x < m_Width; x += m_Step)
             {
-                const uint16* RefBlock = RefPic +
-                    (y - Radius) * m_Stride +
-                    (x - Radius);
-
-                const uint16* TestBlock = TestPic +
-                    (y - Radius) * m_Stride +
-                    (x - Radius);
+                const uint16* RefBlock  = RefPic  + (y - Radius) * m_Stride + (x - Radius);
+                const uint16* TestBlock = TestPic + (y - Radius) * m_Stride + (x - Radius);
 
                 const SSIMStats s = calcStats(RefBlock, TestBlock);
-
                 FrameSSIM += calcSSIM(s);
             }
         }
 
-        SSIMResultCPU[CmpIdx] =
-            FrameSSIM /
-            (static_cast<flt32>(m_Width) * m_Height);
+        SSIMResultCPU[CmpIdx] = FrameSSIM / static_cast<flt32>(m_BlocksWidth * m_BlocksHeight);
+        SSIMSumCPU[CmpIdx]   += SSIMResultCPU[CmpIdx];
     }
 
     tTimePoint T1 = (m_VerboseLevel >= 1) ? tClock::now() : tTimePoint::min();
+    if (m_VerboseLevel >= 1) { DurationCpuCalcSSIM += T1 - T0; }
 
-      if (m_VerboseLevel >= 1) {
-        DurationCpuCalcSSIM += T1 - T0;
-    }
-
-    fmt::printf(
-        "| CPU: LM %8.4f | CB %8.4f | CR %8.4f\n",
-        SSIMResultCPU[0],
-        SSIMResultCPU[1],
-        SSIMResultCPU[2]
-    );
+    fmt::printf("| CPU: LM %8.4f | CB %8.4f | CR %8.4f\n",
+        SSIMResultCPU[0], SSIMResultCPU[1], SSIMResultCPU[2]);
 }
 

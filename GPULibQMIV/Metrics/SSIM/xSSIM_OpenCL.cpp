@@ -7,15 +7,20 @@
 #include <iterator>
 #include <string>
 
-bool xSSIM_OpenCl::create(int32 Width, int32 Height, int32 Margin, int32 BitDepth, int32 BlockSize,
+bool xSSIM_OpenCl::create(int32 Width, int32 Height, int32 Margin, 
+    int32 BitDepth, int32 BlockSize, int Step,
     const std::string& KernelFile, cl::Device& Device)
 {
-    m_Width  = Width;
-    m_Height = Height;
-    m_Margin = Margin;
-    m_Stride = Width + (m_Margin << 1);
-    m_BitDepth = BitDepth;
+    m_Width     = Width;
+    m_Height    = Height;
+    m_Margin    = Margin;
+    m_Stride    = Width + (m_Margin << 1);
+    m_BitDepth  = BitDepth;
     m_BlockSize = BlockSize;
+    m_Step      = Step;
+
+    m_BlocksWidth  = static_cast<int32>(m_Width  + m_Step - 1) / m_Step;
+    m_BlocksHeight = static_cast<int32>(m_Height + m_Step - 1) / m_Step;
 
     m_BuffCmpNumPels          = (m_Width + (m_Margin << 1)) * (m_Height + (m_Margin << 1));
     m_BuffCmpNumBytes         = m_BuffCmpNumPels * sizeof(uint16);
@@ -161,7 +166,7 @@ bool xSSIM_OpenCl::xRunReduceSum(flt32* FrameSSIM, uint8 colorSpace) {
     cl::Kernel& KernelReduceSum =  m_ReduceSumKernel;
     KernelReduceSum.setArg(0, m_BufferProcesLine[colorSpace]);
     KernelReduceSum.setArg(1, m_BufferReduceSum[colorSpace]);
-    KernelReduceSum.setArg(2, m_Height);
+    KernelReduceSum.setArg(2, static_cast<uint32>(m_BlocksHeight));
 
     Result = m_Queue.enqueueNDRangeKernel(KernelReduceSum, cl::NullRange, cl::NDRange(1),
             cl::NullRange, nullptr, &eventKernelReduceSum);
@@ -195,17 +200,14 @@ bool xSSIM_OpenCl::xRunProcesLine(uint8 colorSpace) {
     cl::Event eventKernelProcesLine;
     cl_long start = 0, end = 0;
 
-    cl::Kernel& KernelProcesLine =  m_ProcesLineKernel;
+    cl::Kernel& KernelProcesLine = m_ProcesLineKernel;
     KernelProcesLine.setArg(0, m_BufferProcesBlock[colorSpace]);
     KernelProcesLine.setArg(1, m_BufferProcesLine[colorSpace]);
-    KernelProcesLine.setArg(2, m_Width);
-    KernelProcesLine.setArg(3, m_Height);
-    KernelProcesLine.setArg(4, m_Margin);
-    KernelProcesLine.setArg(5, m_Stride);
+    KernelProcesLine.setArg(2, static_cast<uint32>(m_BlocksWidth));
+    KernelProcesLine.setArg(3, static_cast<uint32>(m_BlocksHeight));
 
-
-    Result = m_Queue.enqueueNDRangeKernel(KernelProcesLine, cl::NullRange, cl::NDRange(m_Height),
-            cl::NullRange, nullptr, &eventKernelProcesLine);
+    Result = m_Queue.enqueueNDRangeKernel(KernelProcesLine, cl::NullRange,
+    cl::NDRange(m_BlocksHeight), cl::NullRange, nullptr, &eventKernelProcesLine);
     if (Result != CL_SUCCESS) {
         fmt::printf("ERROR - NDRangeKernel ProceLine - %d\n", Result);
         return false;
@@ -260,30 +262,22 @@ bool xSSIM_OpenCl::xRunProcesBlock(xPic& PicRef, xPic& PicTest, uint8 colorSpace
     TimeCopyBuff += static_cast<double>(end - start) / 1000000.0; // z ns do ms
 
     cl::Kernel& ProcesBlockKernel = m_ProcesBlockKernel;
-    Result = ProcesBlockKernel.setArg(0, m_BufferRef[colorSpace]);
-    if (Result != CL_SUCCESS) { fmt::printf("ERROR - setArg 0 - %d\n", Result); return false; }
-    Result = ProcesBlockKernel.setArg(1, m_BufferTest[colorSpace]);
-    if (Result != CL_SUCCESS) { fmt::printf("ERROR - setArg 1 - %d\n", Result); return false; }
-    Result = ProcesBlockKernel.setArg(2, m_BufferProcesBlock[colorSpace]);
-    if (Result != CL_SUCCESS) { fmt::printf("ERROR - setArg 2 - %d\n", Result); return false; }
-    Result = ProcesBlockKernel.setArg(3, m_BlockSize);
-    if (Result != CL_SUCCESS) { fmt::printf("ERROR - setArg 3 - %d\n", Result); return false; }
-    Result = ProcesBlockKernel.setArg(4, m_Width);
-    if (Result != CL_SUCCESS) { fmt::printf("ERROR - setArg 4 - %d\n", Result); return false; }
-    Result = ProcesBlockKernel.setArg(5, m_Height);
-    if (Result != CL_SUCCESS) { fmt::printf("ERROR - setArg 5 - %d\n", Result); return false; }
-    Result = ProcesBlockKernel.setArg(6, m_Margin);
-    if (Result != CL_SUCCESS) { fmt::printf("ERROR - setArg 6 - %d\n", Result); return false; }
-    Result = ProcesBlockKernel.setArg(7, m_Stride);
-    if (Result != CL_SUCCESS) { fmt::printf("ERROR - setArg 7 - %d\n", Result); return false; }
-    Result = ProcesBlockKernel.setArg(8, static_cast<flt32>(m_C1));
-    if (Result != CL_SUCCESS) { fmt::printf("ERROR - setArg C1 - %d\n", Result); return false; }
-
-    Result = ProcesBlockKernel.setArg(9, static_cast<flt32>(m_C2));
-    if (Result != CL_SUCCESS) { fmt::printf("ERROR - setArg C2 - %d\n", Result); return false; }
+    ProcesBlockKernel.setArg(0, m_BufferRef[colorSpace]);
+    ProcesBlockKernel.setArg(1, m_BufferTest[colorSpace]);
+    ProcesBlockKernel.setArg(2, m_BufferProcesBlock[colorSpace]);
+    ProcesBlockKernel.setArg(3, static_cast<uint32>(m_BlockSize));
+    ProcesBlockKernel.setArg(4, static_cast<uint32>(m_Step));
+    ProcesBlockKernel.setArg(5, static_cast<uint32>(m_Width));
+    ProcesBlockKernel.setArg(6, static_cast<uint32>(m_Height));
+    ProcesBlockKernel.setArg(7, static_cast<uint32>(m_Margin));
+    ProcesBlockKernel.setArg(8, static_cast<uint32>(m_Stride));
+    ProcesBlockKernel.setArg(9, static_cast<flt32>(m_C1));
+    ProcesBlockKernel.setArg(10, static_cast<flt32>(m_C2));
     
-    Result = m_Queue.enqueueNDRangeKernel(ProcesBlockKernel, cl::NullRange, cl::NDRange(m_Width, m_Height), cl::NullRange,
-            nullptr, &eventKernelProcesBlock);
+
+    Result = m_Queue.enqueueNDRangeKernel(ProcesBlockKernel, cl::NullRange,
+    cl::NDRange(m_BlocksWidth, m_BlocksHeight), cl::NullRange,
+    nullptr, &eventKernelProcesBlock);
     if (Result != CL_SUCCESS) {
         fmt::printf("ERROR - enequeue NDRange Kernel Proces Block - %d\n", Result);
         return false;
@@ -315,10 +309,9 @@ bool xSSIM_OpenCl::processFrame(xPic& PicRef, xPic& PicTest) {
         if (!xRunProcesLine(CmpIdx)) {return false;}
 
         if (!xRunReduceSum(&FrameSSIM, CmpIdx)) {return false;}
-        
-        SSIMResultGPU[CmpIdx] =
-            FrameSSIM /
-            (static_cast<flt32>(m_Width) * m_Height);
+
+        SSIMResultGPU[CmpIdx] = FrameSSIM / static_cast<flt32>(m_BlocksWidth * m_BlocksHeight);
+        SSIMSumGPU[CmpIdx]   += SSIMResultGPU[CmpIdx];
     }
 
     fmt::printf(

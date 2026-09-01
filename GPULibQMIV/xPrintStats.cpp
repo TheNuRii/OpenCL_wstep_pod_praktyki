@@ -5,7 +5,7 @@
 using tDurationF64 = std::chrono::duration<flt64, std::milli>;
 
 void xPrintStats::printTablePSNR(
-    uint32 Frame,
+    uint32 NumFrame,
     flt64 GpuLm,
     flt64 GpuCb,
     flt64 GpuCr,
@@ -45,7 +45,6 @@ void xPrintStats::printTablePSNR(
 }
 
 void xPrintStats::printTableSSINM(
-    uint32 Frame,
     flt64 GpuLm,
     flt64 GpuCb,
     flt64 GpuCr,
@@ -70,15 +69,15 @@ void xPrintStats::printTableSSINM(
 
     fmt::printf(
         "GPU PSNR   %10.4f            %10.4f             %10.4f \n",
-        GpuLm / Frame,
-        GpuCb / Frame,
-        GpuCr / Frame);
+        GpuLm,
+        GpuCb,
+        GpuCr);
 
     fmt::printf(
         "CPU PSNR   %10.4f            %10.4f             %10.4f \n",
-        CpuLm / Frame,
-        CpuCb / Frame,
-        CpuCr / Frame);
+        CpuLm,
+        CpuCb ,
+        CpuCr );
 
     fmt::printf(
         "---------------------------------------------------------------------------\n");
@@ -126,17 +125,16 @@ void xPrintStats::printTimeTablePSNR(
 }
 
 void xPrintStats::printTimeTableSSIM(
-    uint32 NumFrames,
     flt64 GpuCopyBuff,
     flt64 GpuReadBuff,
     flt64 GpuExecKernelProcesBlock,
     flt64 GpuExecKernelProcesLine,
     flt64 GpuExecKernelReduceSum,
     std::string kerneltype,
-    tDuration CpuDuration)
+    flt64 CpuDuration)
 {
     flt64 total = static_cast<flt64>(GpuCopyBuff + GpuCopyBuff + GpuExecKernelProcesBlock 
-        + GpuExecKernelProcesLine + GpuExecKernelReduceSum) / NumFrames;
+        + GpuExecKernelProcesLine + GpuExecKernelReduceSum);
     fmt::printf(
         "---------------------------------------------------------------------------\n");
 
@@ -148,18 +146,17 @@ void xPrintStats::printTimeTableSSIM(
     fmt::printf(
         "---------------------------------------------------------------------------\n");
 
-    fmt::printf("Copy from CPU(host) to Buffor GPU      %10.4f ms\n",GpuCopyBuff / NumFrames);
-    fmt::printf("Read form a Buffer                     %10.4f ms\n", GpuReadBuff / NumFrames);
-    fmt::printf("Execution ProcesBlock Kernel           %10.4f ms\n",GpuExecKernelProcesBlock / NumFrames);
-    fmt::printf("Execution ProcesLine Kernel            %10.4f ms\n",GpuExecKernelProcesLine / NumFrames);
-    fmt::printf("Execution ReduceSum Kernel             %10.4f ms\n",GpuExecKernelReduceSum / NumFrames);
+    fmt::printf("Copy from CPU(host) to Buffor GPU      %10.4f ms\n",GpuCopyBuff);
+    fmt::printf("Read form a Buffer                     %10.4f ms\n", GpuReadBuff );
+    fmt::printf("Execution ProcesBlock Kernel           %10.4f ms\n",GpuExecKernelProcesBlock );
+    fmt::printf("Execution ProcesLine Kernel            %10.4f ms\n",GpuExecKernelProcesLine );
+    fmt::printf("Execution ReduceSum Kernel             %10.4f ms\n",GpuExecKernelReduceSum );
    
     fmt::printf(
         "---------------------------------------------------------------------------\n");
 
     fmt::printf("Total GPU avg time:                    %10.4f ms\n", total);
-    fmt::printf("Total CPU avg time:                    %10.4f ms\n", 
-        std::chrono::duration_cast<tDurationF64>(CpuDuration).count() / NumFrames);
+    fmt::printf("Total CPU avg time:                    %10.4f ms\n", CpuDuration);
    
     fmt::printf(
         "---------------------------------------------------------------------------\n");
