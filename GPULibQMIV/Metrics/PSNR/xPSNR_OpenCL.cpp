@@ -212,19 +212,21 @@ bool xPSNR_OpenCL::xRunSquaredDiff(xPic& Ref, xPic& Test, uint8_t colorSpce) {
 
 bool xPSNR_OpenCL::xRunReduceSum(uint64* SqrDiff, uint8_t colorSpace) {
     cl_int Result = CL_SUCCESS;
-    cl::Event eventFillBuff;
+    //cl::Event eventFillBuff;
     cl::Event eventKernel;
     cl::Event eventReadBuff;
     cl_ulong start = 0, end = 0;
 
-    cl_ulong zero = 0;
-    Result = m_Queue.enqueueFillBuffer(m_BufferTotalDiff[colorSpace], zero, 0, sizeof(cl_ulong), nullptr, &eventFillBuff);
-    if (Result != CL_SUCCESS) { fmt::printf("ERROR - enqueueFillBuffer - %d\n", Result); return false;}
+    // nie akumuljemy wartości w kernelu mamy akmulator i wartoś niego przypisujemy do buffora
+    // wiec zerowanie buffora jest zbędne
+    //cl_ulong zero = 0; 
+    //Result = m_Queue.enqueueFillBuffer(m_BufferTotalDiff[colorSpace], zero, 0, sizeof(cl_ulong), nullptr, &eventFillBuff);
+    //if (Result != CL_SUCCESS) { fmt::printf("ERROR - enqueueFillBuffer - %d\n", Result); return false;}
 
-    eventFillBuff.wait();
-    eventFillBuff.getProfilingInfo(CL_PROFILING_COMMAND_START, &start);
-    eventFillBuff.getProfilingInfo(CL_PROFILING_COMMAND_END, &end);
-    TimeFillBuff += static_cast<double>(end - start) / 1000000.0;                   // z nano przejscie do milisekun dla tego dzielimy
+    //eventFillBuff.wait();
+    //eventFillBuff.getProfilingInfo(CL_PROFILING_COMMAND_START, &start);
+    //eventFillBuff.getProfilingInfo(CL_PROFILING_COMMAND_END, &end);
+    //TimeFillBuff += static_cast<double>(end - start) / 1000000.0;                   // z nano przejscie do milisekun dla tego dzielimy
 
     cl::Kernel& K = m_Kernels[(int32)eKernelOp::SSDREDUCESUM];
     K.setArg(0, m_BufferSqrDiff[colorSpace]);
@@ -259,7 +261,6 @@ bool xPSNR_OpenCL::xRunReduceSum(uint64* SqrDiff, uint8_t colorSpace) {
 // ============================================================================== ===================================================================================================================================
 
 bool xPSNR_OpenCL::processFrame(xPic& Ref, xPic& Test) {
-    cl_int Result = CL_SUCCESS;
     if (!xRunSquaredDiff(Ref, Test, (uint8_t)colorSpace::LM)) {return false;}
     
     if (!xRunSquaredDiff(Ref, Test, (uint8_t)colorSpace::CB)) {return false;}
@@ -288,23 +289,21 @@ bool xPSNR_OpenCL::processFrame(xPic& Ref, xPic& Test) {
         uint64_t MaxVal    = (uint64_t)(pow(2.0, m_BitDepth) - 1);
         flt64 MAX          = NumPoints * (MaxVal * MaxVal);
 
-        PSNR[CmpIdx] = (SSD[CmpIdx] > 0)
+        PSNRResultGPU[CmpIdx] = (SSD[CmpIdx] > 0)
             ? 10.0 * std::log10(MAX / SSD[CmpIdx])
             : std::numeric_limits<double>::infinity();
+        
+        PSNRSumGPU[CmpIdx] += PSNRResultGPU[CmpIdx];
     }
 
-    
-    fmt::printf("GPU: LM %8.4f db |CB %8.4f dB |CR %8.4f dB ", PSNR[0], PSNR[1], PSNR[2]);
-
-    GpuResultPSNRLm += PSNR[0];
-    GpuResultPSNRCb += PSNR[1];
-    GpuResultPSNRCr += PSNR[2];
+    fmt::printf("GPU: LM %8.4f db |CB %8.4f dB |CR %8.4f dB ", 
+        PSNRResultGPU[0], PSNRResultGPU[1], PSNRResultGPU[2]);
 
     return true;
 }
 
 // =================================================================================================================================================================================================================
-
+/*
 void xPSNR_OpenCL::printPSNRStats(uint64 SSD, uint8 coloSpace) {
     //fmt::printf("%f", SSD);
 
@@ -324,9 +323,5 @@ void xPSNR_OpenCL::printTimeStats(int32 NumFrames)
   fmt::printf("AvgTime ExecKernel Reduce %9.4f ms\n", TimeExecKernelReduce / NumFrames);
   fmt::printf("AvgTime ReadBuff   %9.4f ms\n", TimeReadBuff / NumFrames);
 }
-void xPSNR_OpenCL::gpuAvgPSNR(uint32 NumFrames) {
-    GpuResultPSNRLm = GpuResultPSNRLm / NumFrames;
-    GpuResultPSNRCb = GpuResultPSNRCb / NumFrames;
-    GpuResultPSNRCr = GpuResultPSNRCr / NumFrames; 
-}
+*/
 // =================================================================================================================================================================================================================

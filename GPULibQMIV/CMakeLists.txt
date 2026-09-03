@@ -82,6 +82,9 @@ set(PROJECT_SOURCES
   ./Metrics/SSIM/xSSIM_OpenCL.cpp
   ./Metrics/SSIM/xSSIM.h
   ./Metrics/SSIM/xSSIM.cpp
+
+  ./Metrics/IVPreProcessing/xIVPreProcessing.h
+  ./Metrics/IVPreProcessing/xIVPreProcessing.cpp
 )
 
 source_group("Source Files" FILES ${PROJECT_SOURCES})

@@ -7,7 +7,6 @@ class xPrintStats
 {
 public:
     static void printTablePSNR(
-        uint32 Frame,
         flt64 GpuLm,
         flt64 GpuCb,
         flt64 GpuCr,
@@ -24,14 +23,12 @@ public:
         flt64 CpuCr);
 
     static void printTimeTablePSNR(
-        uint32 Frame,
         flt64 GpuCopyBuff,
         flt64 GpuExecKernelSqrDiff,
         flt64 GpuExecKernelReduce,
         flt64 GpuReadBuff,
-        flt64 GpuFillBuff,
         std::string kerneltype,
-        tDuration CpuDuration);
+        flt64 CpuDuration);
 
     static void printTimeTableSSIM(
         flt64 GpuCopyBuff,

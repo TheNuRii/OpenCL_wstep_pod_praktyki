@@ -5,7 +5,6 @@
 using tDurationF64 = std::chrono::duration<flt64, std::milli>;
 
 void xPrintStats::printTablePSNR(
-    uint32 NumFrame,
     flt64 GpuLm,
     flt64 GpuCb,
     flt64 GpuCr,
@@ -86,16 +85,14 @@ void xPrintStats::printTableSSINM(
 // ------------------------------------------------------------------------------------------------------------
 
 void xPrintStats::printTimeTablePSNR(
-    uint32 NumFrames,
     flt64 GpuCopyBuff,
     flt64 GpuExecKernelSqrDiff,
     flt64 GpuExecKernelReduce,
     flt64 GpuReadBuff,
-    flt64 GpuFillBuff,
     std::string kerneltype,
-    tDuration CpuDuration)
+    flt64 CpuDuration)
 {
-    flt64 total = static_cast<flt64>(GpuCopyBuff + GpuCopyBuff + GpuExecKernelSqrDiff + GpuExecKernelReduce + GpuFillBuff) / NumFrames;
+    flt64 total = static_cast<flt64>(GpuCopyBuff + GpuCopyBuff + GpuExecKernelSqrDiff + GpuExecKernelReduce);
     fmt::printf(
         "---------------------------------------------------------------------------\n");
 
@@ -107,18 +104,14 @@ void xPrintStats::printTimeTablePSNR(
     fmt::printf(
         "---------------------------------------------------------------------------\n");
 
-    fmt::printf("Copy from CPU(host) to Buffor GPU      %10.4f ms\n",GpuCopyBuff / NumFrames);
-    fmt::printf("Read form a Buffer                     %10.4f ms\n", GpuReadBuff / NumFrames);
-    fmt::printf("Execution SqrDiff Kernel               %10.4f ms\n",GpuExecKernelSqrDiff / NumFrames);
-    fmt::printf("Execution SqrDiff Kernel               %10.4f ms\n",GpuExecKernelReduce / NumFrames);
-    fmt::printf("Fill GPU buffor with a val             %10.4f ms\n", GpuFillBuff / NumFrames);
-   
-    fmt::printf(
-        "---------------------------------------------------------------------------\n");
+    fmt::printf("Copy from CPU(host) to Buffor GPU      %10.4f ms\n",GpuCopyBuff);
+    fmt::printf("Read form a Buffer                     %10.4f ms\n", GpuReadBuff);
+    fmt::printf("Execution SqrDiff Kernel               %10.4f ms\n",GpuExecKernelSqrDiff);
+    fmt::printf("Execution SqrDiff Kernel               %10.4f ms\n",GpuExecKernelReduce);
+    fmt::printf("---------------------------------------------------------------------------\n");
 
     fmt::printf("Total GPU avg time:                    %10.4f ms\n", total);
-    fmt::printf("Total CPU avg time:                    %10.4f ms\n", 
-        std::chrono::duration_cast<tDurationF64>(CpuDuration).count() / NumFrames);
+    fmt::printf("Total CPU avg time:                    %10.4f ms\n", CpuDuration);
    
     fmt::printf(
         "---------------------------------------------------------------------------\n");

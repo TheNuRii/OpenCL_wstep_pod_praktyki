@@ -122,7 +122,7 @@ void xPic::interleave()
 
 // TO DO: zerowanie bufora
 void xPic::zero() {
-  for (uint32 CmpIdx = 0; CmpIdx < 0; CmpIdx++){
+  for (int32 CmpIdx = 0; CmpIdx < 0; CmpIdx++){
     std::memset(m_BufferPlanar[CmpIdx], 0, m_BuffCmpNumBytes);
   }
 }
@@ -132,10 +132,10 @@ void xPic::fill(uint16 value) {
   for(uint32 CmpIdx = 0; CmpIdx < 3; CmpIdx++) {
     uint16* buffer = m_BufferPlanar[CmpIdx];
 
-    for (uint32 y = 0; y < m_Height; y++){
+    for (int32 y = 0; y < m_Height; y++){
       uint16* row = buffer + (y + m_Margin)* m_Stride + m_Margin;
       
-      for (uint32 x = 0; x < m_Width; x++){
+      for (int32 x = 0; x < m_Width; x++){
         row[x] = value;
       }
     }

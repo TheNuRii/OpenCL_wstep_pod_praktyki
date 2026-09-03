@@ -23,12 +23,11 @@ public:
         CB = 1,
         CR = 2,
     };
-    
-    flt64 GpuResultPSNRLm = 0;
-    flt64 GpuResultPSNRCb = 0;
-    flt64 GpuResultPSNRCr = 0;
-    
+        
 protected:
+    std::array<flt64, 3> PSNRResultGPU;
+    std::array<flt64, 3> PSNRSumGPU = {0.0, 0.0, 0.0};
+
     int64 m_BuffSqrDiffNumBytes  = NOT_VALID;
     int32 m_BuffCmpNumBytes = NOT_VALID;
     int32 m_BuffCmpNumPels = NOT_VALID;
@@ -48,7 +47,7 @@ protected:
     flt64     TimeExecKernelSqrDiff = 0;
     flt64     TimeExecKernelReduce  = 0;
     flt64     TimeReadBuff          = 0;
-    flt64     TimeFillBuff          = 0; 
+    //flt64     TimeFillBuff          = 0; 
 
 
     tDuration DurationWriteBuff  = tDuration(0);
@@ -57,23 +56,17 @@ protected:
 public:
     bool create(int32 Width, int32 Height, int32 Margin, int32 BitDepth,
         const std::string& KernelsFile, cl::Device& Device);
-    
-    void printTimeStats(int32  NumFrames);
-    void printPSNRStats(uint64 SSD, uint8 colorSpace);
-    void printAvgPNSRStats(uint32 NumFrames);
+
     bool processFrame(xPic& Ref, xPic& Test);
-    void gpuAvgPSNR(uint32 NumFrames);
 
     // Getery do analizy w glowny programie 
-    flt64 getGpuResultPSNRLm()  { return GpuResultPSNRLm; }
-    flt64 getGpuResultPSNRCb()  { return GpuResultPSNRCb; }
-    flt64 getGpuResultPSNRCr()  { return GpuResultPSNRCr; }
+    flt64 getAvgPSNR(int32 CmpIdx, int32 NumFrames) const { 
+        return static_cast<flt64>(PSNRSumGPU[CmpIdx] / NumFrames); }
 
-    flt64 getTimeCopyBuff()     { return TimeCopyBuff; }
-    flt64 getTimeExecKernelSqrDiff()   { return TimeExecKernelSqrDiff; }
-    flt64 getTimeExecKernelReduce()   { return TimeExecKernelReduce; }
-    flt64 getTimeReadBuff()     { return TimeReadBuff; }
-    flt64 getTimeFillBuff()     { return TimeFillBuff; }
+    flt64 getAvgTimeCopyBuff(int32 NumFrames)              const { return TimeCopyBuff / NumFrames; }
+    flt64 getAvgTimeReadBuff(int32 NumFrames)              const { return TimeReadBuff / NumFrames; }
+    flt64 getAvgTimeExecKernelReduce (int32 NumFrames)     const { return TimeExecKernelReduce  / NumFrames; }
+    flt64 getAvgTimeExecKernelSqrDiff(int32 NumFrames)     const { return TimeExecKernelSqrDiff / NumFrames; }
 
 protected:
     bool xRunSquaredDiff(xPic& Ref, xPic& Test, uint8_t colorSpace);

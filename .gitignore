@@ -69,5 +69,10 @@ Testing/
 .cache/
 
 #Materials/*.yuv
-Materials/*.rgb
-Materials/*.yuv
+*.rgb
+*.yuv
+
+#vscode 
+.vscode
+launch.json
+setting.json

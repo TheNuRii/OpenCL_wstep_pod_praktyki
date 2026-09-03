@@ -43,11 +43,6 @@ public:
         const std::string& KernelsFile, cl::Device& Device);
 
     bool processFrame(xPic& PicRef, xPic& PicTest);
-
-    bool xRunProcesBlock(xPic& PicRef, xPic& PicTest, uint8 colorSpace);
-    bool xRunProcesLine(uint8 colorSpace);
-    bool xRunReduceSum(flt32* FrameSSIM, uint8 colorSpace);
-
     flt32 getAvgSSIM(int32 CmpIdx, int32 NumFrames) const { 
         return static_cast<flt32>(SSIMSumGPU[CmpIdx] / NumFrames); }
 
@@ -56,4 +51,9 @@ public:
     flt64 getAvgTimeExecKernelProcesBlock(int32 NumFrames) const { return TimeExecKernelProcesBlock / NumFrames; }
     flt64 getAvgTimeExecKernelProcesLine(int32 NumFrames)  const { return TimeExecKernelProcesLine / NumFrames; }
     flt64 getAvgTimeExecKernelReduceSum(int32 NumFrames)   const { return TimeExecKernelReduceSum / NumFrames; }
+    
+protected:
+    bool xRunProcesBlock(xPic& PicRef, xPic& PicTest, uint8 colorSpace);
+    bool xRunProcesLine(uint8 colorSpace);
+    bool xRunReduceSum(flt32* FrameSSIM, uint8 colorSpace);
 };

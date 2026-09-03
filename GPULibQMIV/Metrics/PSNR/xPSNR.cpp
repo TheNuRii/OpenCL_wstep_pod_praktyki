@@ -3,14 +3,19 @@
 #include <vector>
 #include "../../lib_fmt/printf.h"
 
+bool xPSNR::create(int32 Width, int32 Height, int32 Margin, int32 BitDepth)
+{
+    m_Width     = Width;
+    m_Height    = Height;
+    m_Margin    = Margin;
+    m_Stride    = Width + (m_Margin << 1);
+    m_BitDepth  = BitDepth;
+
+    return true;
+}
+
 void xPSNR::processFrame(xPic& Ref, xPic& Test)
 {   
-    m_Width    = Ref.getWidth();
-    m_Height   = Ref.getHeight();
-    m_Margin   = Ref.getMargin();
-    m_Stride   = Ref.getStride();
-    m_BitDepth = Ref.getBitDepth();
-
     std::vector<uint64_t> SSD(3);
 
     tTimePoint T0 = (m_VerboseLevel >= 1) ? tClock::now() : tTimePoint::min();
@@ -29,34 +34,25 @@ void xPSNR::processFrame(xPic& Ref, xPic& Test)
 
     tTimePoint T1 = (m_VerboseLevel >= 1) ? tClock::now() : tTimePoint::min();
 
-    std::vector<flt64> PSNR(3);
-
     for (int32 CmpIdx = 0; CmpIdx < 3; CmpIdx++)
     {
         uint64_t NumPoints = (uint64_t)m_Width * m_Height;
         uint64_t MaxVal    = (uint64_t)(pow(2.0, m_BitDepth) - 1);
         flt64 MAX          = NumPoints * (MaxVal * MaxVal);
 
-        PSNR[CmpIdx] = (SSD[CmpIdx] > 0)
+        PSNRResultCPU[CmpIdx] = (SSD[CmpIdx] > 0)
             ? 10.0 * std::log10(MAX / SSD[CmpIdx])
             : std::numeric_limits<double>::infinity();
     }
 
     fmt::printf(
         "| CPU: LM %8.4f dB | CB %8.4f dB | CR %8.4f dB\n",
-        PSNR[0], PSNR[1], PSNR[2]
+        PSNRResultCPU[0], PSNRResultCPU[1], PSNRResultCPU[2]
     );
-    CpuResultPSNRLm += PSNR[0];
-    CpuResultPSNRCb += PSNR[1];
-    CpuResultPSNRCr += PSNR[2];
+    
+    for (int32 CmpIdx = 0; CmpIdx < 3; CmpIdx++) {PSNRSumCPU[CmpIdx] += PSNRResultCPU[CmpIdx];}
 
     if (m_VerboseLevel >= 1) {
         DurationCpuCalcSSD += T1 - T0;
     }
 }
-
-void xPSNR::cpuAvgPNSR(uint32 NumFrames) {
-    CpuResultPSNRLm = CpuResultPSNRLm / NumFrames;
-    CpuResultPSNRCb = CpuResultPSNRCb / NumFrames;
-    CpuResultPSNRCr = CpuResultPSNRCr / NumFrames;
-};

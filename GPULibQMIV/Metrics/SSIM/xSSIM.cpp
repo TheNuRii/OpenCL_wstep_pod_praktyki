@@ -5,7 +5,7 @@ bool xSSIM::create(int32 Width, int32 Height, int32 Margin,
 
     m_Width     = Width;
     m_Height    = Height;
-    m_Margin    = 8; // tyle by zabezpieczycz blok 11 x 11 na krancu obrazu
+    m_Margin    = Margin; // tyle by zabezpieczycz blok 11 x 11 na krancu obrazu
     m_Stride    = m_Width + (m_Margin << 1);
     m_BitDepth  = BitDepth;
     m_BlockSize = BlockSize;
@@ -47,13 +47,13 @@ xSSIM::SSIMStats xSSIM::calcStats(const uint16* X, const uint16* Y){
 
     const uint32 N = m_BlockSize * m_BlockSize;
 
-    for (uint32 row = 0; row < m_BlockSize; row++)
+    for (int32 row = 0; row < m_BlockSize; row++)
     {
         const uint16* XRow = X + row * m_Stride;
 
         const uint16* YRow = Y + row * m_Stride;
 
-        for (uint32 col = 0; col < m_BlockSize; col++)
+        for (int32 col = 0; col < m_BlockSize; col++)
         {
             const uint64 x = XRow[col];
             const uint64 y = YRow[col];
